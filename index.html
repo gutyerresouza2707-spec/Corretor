@@ -1,0 +1,1514 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>CorretorPro — Gestor de Negócios</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+
+<!-- Firebase -->
+<script type="module">
+  import { initializeApp }               from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+  import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot }
+    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+  /* ── CONFIGURE O FIREBASE AQUI ─────────────────────────────────────────
+     Cole as credenciais do seu projeto Firebase abaixo.
+     Acesse: https://console.firebase.google.com → Configurações do projeto → Seus apps
+  ──────────────────────────────────────────────────────────────────────── */
+  const firebaseConfig = {
+    apiKey:            "SUA_API_KEY",
+    authDomain:        "SEU_PROJETO.firebaseapp.com",
+    projectId:         "SEU_PROJETO",
+    storageBucket:     "SEU_PROJETO.appspot.com",
+    messagingSenderId: "SEU_SENDER_ID",
+    appId:             "SEU_APP_ID"
+  };
+
+  const APP_ID = "corretor-pro";
+
+  const fbApp = initializeApp(firebaseConfig);
+  const auth  = getAuth(fbApp);
+  const db    = getFirestore(fbApp);
+
+  // Disponibiliza globalmente para o script principal
+  window._fb = { auth, db, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, APP_ID };
+
+  signInAnonymously(auth).catch(e => {
+    console.warn("Firebase não configurado — usando localStorage:", e.message);
+    window._fbOffline = true;
+  });
+</script>
+
+<style>
+/* ═══════════════════════════════════════════════════════════════
+   DESIGN TOKENS
+═══════════════════════════════════════════════════════════════ */
+:root {
+  --bg:          #080810;
+  --surface:     #0f0f18;
+  --surface2:    #16161f;
+  --surface3:    #1c1c28;
+  --border:      rgba(255,255,255,0.06);
+  --border2:     rgba(255,255,255,0.11);
+  --accent:      #6c63ff;
+  --accent2:     #a78bfa;
+  --accent-glow: rgba(108,99,255,0.28);
+  --green:       #22d3a5;
+  --orange:      #f97316;
+  --red:         #f43f5e;
+  --text:        #ededf5;
+  --muted:       #5f5f72;
+  --muted2:      #9494a8;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  min-height: 100vh;
+}
+
+/* scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 99px; }
+
+/* ═══ ANIMATIONS ═══ */
+@keyframes spin         { to { transform: rotate(360deg); } }
+@keyframes slideIn      { from { opacity:0; transform:translateY(-10px); } to { opacity:1; transform:translateY(0); } }
+@keyframes slideInRight { from { opacity:0; transform:translateX(14px); } to { opacity:1; transform:translateX(0); } }
+@keyframes fadeIn       { from { opacity:0; } to { opacity:1; } }
+@keyframes scaleIn      { from { opacity:0; transform:scale(.94); } to { opacity:1; transform:scale(1); } }
+@keyframes pulse-dot    { 0%,100%{opacity:1;} 50%{opacity:.3;} }
+
+/* ═══ LAYOUT ═══ */
+.app-wrap { display:flex; min-height:100vh; }
+
+/* ═══ SIDEBAR ═══ */
+.sidebar {
+  width: 232px;
+  min-height: 100vh;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  transition: transform .28s cubic-bezier(.4,0,.2,1);
+  z-index: 100;
+}
+.logo-area { padding:26px 22px 18px; border-bottom:1px solid var(--border); }
+.logo-icon {
+  width:36px; height:36px;
+  background: linear-gradient(135deg, var(--accent), #8b5cf6);
+  border-radius:10px;
+  display:flex; align-items:center; justify-content:center;
+  box-shadow: 0 0 24px var(--accent-glow);
+}
+.logo-icon svg { width:18px; height:18px; color:#fff; }
+
+.nav-section-label {
+  font-size:10px; font-weight:700; text-transform:uppercase;
+  letter-spacing:.1em; color:var(--muted); padding:14px 14px 6px;
+}
+.nav-btn {
+  width:100%; display:flex; align-items:center; gap:9px;
+  padding:10px 12px; border-radius:10px;
+  background:none; border:none; color:var(--muted2);
+  font-family:'DM Sans',sans-serif; font-size:13.5px; font-weight:500;
+  cursor:pointer; transition:all .16s; text-align:left; position:relative;
+}
+.nav-btn:hover { background:var(--surface2); color:var(--text); }
+.nav-btn.active {
+  background: linear-gradient(135deg,rgba(108,99,255,.18),rgba(167,139,250,.06));
+  color:var(--accent2); border:1px solid rgba(108,99,255,.18);
+}
+.nav-btn.active svg { color:var(--accent) !important; }
+.nav-btn.active::before {
+  content:''; position:absolute; left:0; top:20%; bottom:20%;
+  width:3px; background:var(--accent); border-radius:0 3px 3px 0;
+}
+.nav-btn svg { width:15px; height:15px; flex-shrink:0; }
+.badge {
+  margin-left:auto; background:var(--surface3); border:1px solid var(--border);
+  color:var(--muted2); font-size:10px; font-weight:700;
+  padding:2px 7px; border-radius:99px;
+}
+.nav-btn.active .badge { background:rgba(108,99,255,.2); color:var(--accent2); border-color:rgba(108,99,255,.3); }
+
+.sidebar-footer { padding:12px 10px; border-top:1px solid var(--border); }
+.user-card {
+  display:flex; align-items:center; gap:8px; padding:8px 10px;
+  border-radius:10px; background:var(--surface2); border:1px solid var(--border);
+}
+.user-avatar {
+  width:26px; height:26px; border-radius:8px;
+  background:linear-gradient(135deg,rgba(108,99,255,.3),rgba(167,139,250,.15));
+  border:1px solid rgba(108,99,255,.25);
+  display:flex; align-items:center; justify-content:center;
+}
+.user-avatar svg { width:13px; height:13px; color:var(--accent2); }
+.pulse-dot {
+  width:5px; height:5px; border-radius:50%;
+  background:var(--green); animation:pulse-dot 2s infinite;
+}
+
+/* ═══ MAIN ═══ */
+.main { flex:1; overflow-y:auto; padding:34px 38px; }
+.page { display:none; animation:slideInRight .22s ease both; }
+.page.active { display:block; }
+
+/* ═══ PAGE HEADER ═══ */
+.page-header { display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:26px; }
+.page-title { font-family:'Syne',sans-serif; font-size:26px; font-weight:800; line-height:1; letter-spacing:-.025em; }
+.page-sub { font-size:13px; color:var(--muted); margin-top:5px; }
+.page-header-actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+
+/* ═══ STAT CARDS ═══ */
+.stat-card {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:16px; padding:20px 22px;
+  display:flex; flex-direction:column; gap:10px;
+  transition:border-color .2s, transform .2s, box-shadow .2s;
+  position:relative; overflow:hidden;
+}
+.stat-card::before {
+  content:''; position:absolute; top:0; left:0; right:0; height:1px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.07),transparent);
+}
+.stat-card:hover { border-color:var(--border2); transform:translateY(-2px); box-shadow:0 8px 32px rgba(0,0,0,.3); }
+.stat-card.accent { background:linear-gradient(135deg,#1a1740,#13102e); border-color:rgba(108,99,255,.28); }
+.stat-card.accent::before { background:linear-gradient(90deg,transparent,rgba(108,99,255,.5),transparent); }
+.stat-icon { width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; }
+.stat-icon svg { width:17px; height:17px; }
+.stat-label { font-size:11px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.06em; margin-bottom:2px; }
+.stat-value { font-family:'Syne',sans-serif; font-size:24px; font-weight:700; line-height:1; letter-spacing:-.02em; }
+
+/* ═══ GRIDS ═══ */
+.grid-4 { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; }
+.grid-3 { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
+.grid-2 { display:grid; grid-template-columns:repeat(2,1fr); gap:14px; }
+.grid-2-1 { display:grid; grid-template-columns:2fr 1fr; gap:18px; }
+.grid-1-1 { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+
+/* ═══ PERF CARD ═══ */
+.perf-card {
+  background:linear-gradient(135deg,#0d0c1e,#11102a);
+  border:1px solid rgba(108,99,255,.22); border-radius:16px; padding:26px;
+  position:relative; overflow:hidden;
+}
+.perf-card::after {
+  content:''; position:absolute; width:220px; height:220px;
+  right:-55px; bottom:-55px;
+  background:radial-gradient(circle,rgba(108,99,255,.18) 0%,transparent 70%);
+  pointer-events:none;
+}
+.perf-metric {
+  background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.06);
+  border-radius:12px; padding:14px 16px; transition:border-color .15s;
+}
+.perf-metric:hover { border-color:rgba(108,99,255,.25); }
+.perf-label { font-size:10px; color:rgba(167,139,250,.55); margin-bottom:7px; text-transform:uppercase; letter-spacing:.07em; font-weight:700; }
+.perf-val { font-family:'Syne',sans-serif; font-size:34px; font-weight:800; line-height:1; }
+
+/* ═══ PROGRESS BAR ═══ */
+.progress-bar { height:4px; border-radius:99px; background:var(--border2); overflow:hidden; margin-top:8px; }
+.progress-fill { height:100%; border-radius:99px; background:linear-gradient(90deg,var(--accent),var(--accent2)); transition:width .4s; }
+
+/* ═══ TABLE ═══ */
+.table-wrap { background:var(--surface); border:1px solid var(--border); border-radius:16px; overflow:hidden; }
+table { width:100%; border-collapse:collapse; }
+thead th {
+  background:var(--surface2); padding:11px 18px;
+  font-size:10.5px; font-weight:700; text-transform:uppercase;
+  letter-spacing:.07em; color:var(--muted); text-align:left;
+  border-bottom:1px solid var(--border); white-space:nowrap;
+}
+tbody tr { border-bottom:1px solid var(--border); transition:background .12s; }
+tbody tr:last-child { border-bottom:none; }
+tbody tr:hover { background:var(--surface2); }
+tbody td { padding:13px 18px; font-size:13px; vertical-align:middle; }
+
+/* ═══ PILLS ═══ */
+.pill {
+  display:inline-flex; align-items:center; gap:4px;
+  padding:3px 8px; border-radius:99px;
+  font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.04em;
+}
+.pill svg { width:10px; height:10px; }
+.pill-green  { background:rgba(34,211,165,.1);  color:var(--green);  border:1px solid rgba(34,211,165,.2); }
+.pill-orange { background:rgba(249,115,22,.1);  color:var(--orange); border:1px solid rgba(249,115,22,.2); }
+.pill-red    { background:rgba(244,63,94,.1);   color:var(--red);    border:1px solid rgba(244,63,94,.2); }
+.pill-accent { background:rgba(108,99,255,.12); color:var(--accent2);border:1px solid rgba(108,99,255,.2); }
+
+/* ═══ FILTER CHIPS ═══ */
+.filter-chip {
+  display:inline-flex; align-items:center; gap:5px;
+  padding:5px 11px; border-radius:99px; font-size:11.5px; font-weight:600;
+  cursor:pointer; transition:all .15s;
+  border:1px solid var(--border2); background:var(--surface2); color:var(--muted2);
+}
+.filter-chip:hover { border-color:var(--muted); color:var(--text); }
+.filter-chip.f-all    { background:rgba(108,99,255,.15); color:var(--accent2); border-color:rgba(108,99,255,.3); }
+.filter-chip.f-green  { background:rgba(34,211,165,.12); color:var(--green);   border-color:rgba(34,211,165,.3); }
+.filter-chip.f-orange { background:rgba(249,115,22,.12); color:var(--orange);  border-color:rgba(249,115,22,.3); }
+.filter-chip.f-red    { background:rgba(244,63,94,.12);  color:var(--red);     border-color:rgba(244,63,94,.3); }
+
+/* ═══ PLATE CHIP ═══ */
+.plate-chip {
+  display:inline-block; font-family:'Syne',monospace; font-size:10.5px; font-weight:700;
+  letter-spacing:.1em; background:var(--surface2); border:1px solid var(--border2);
+  border-radius:5px; padding:2px 6px; color:var(--muted2); text-transform:uppercase;
+}
+
+/* ═══ BUTTONS ═══ */
+.btn-primary {
+  display:inline-flex; align-items:center; gap:7px;
+  background:linear-gradient(135deg,var(--accent),#7c3aed);
+  color:#fff; border:none; border-radius:10px; padding:10px 20px;
+  font-family:'DM Sans',sans-serif; font-size:13.5px; font-weight:600;
+  cursor:pointer; transition:opacity .16s, transform .16s, box-shadow .16s;
+  box-shadow:0 4px 18px rgba(108,99,255,.38); white-space:nowrap;
+}
+.btn-primary:hover { opacity:.9; transform:translateY(-1px); box-shadow:0 6px 26px rgba(108,99,255,.5); }
+.btn-primary svg { width:15px; height:15px; }
+
+.btn-ghost {
+  display:inline-flex; align-items:center; gap:7px;
+  background:transparent; color:var(--muted2);
+  border:1px solid var(--border2); border-radius:10px; padding:10px 16px;
+  font-family:'DM Sans',sans-serif; font-size:13.5px; font-weight:500;
+  cursor:pointer; transition:all .16s; white-space:nowrap;
+}
+.btn-ghost:hover { background:var(--surface2); color:var(--text); border-color:var(--muted); }
+.btn-ghost svg { width:14px; height:14px; }
+
+.btn-danger {
+  display:inline-flex; align-items:center; gap:7px;
+  background:rgba(244,63,94,.12); color:var(--red);
+  border:1px solid rgba(244,63,94,.25); border-radius:10px; padding:10px 16px;
+  font-family:'DM Sans',sans-serif; font-size:13.5px; font-weight:600;
+  cursor:pointer; transition:all .16s;
+}
+.btn-danger:hover { background:var(--red); color:#fff; border-color:var(--red); }
+.btn-danger svg { width:14px; height:14px; }
+
+/* ═══ ACTION BUTTONS ═══ */
+.act-btn {
+  width:30px; height:30px; border-radius:8px;
+  border:1px solid var(--border); background:var(--surface2);
+  color:var(--muted2); display:flex; align-items:center; justify-content:center;
+  cursor:pointer; transition:all .14s;
+}
+.act-btn svg { width:13px; height:13px; }
+.act-btn.edit:hover { border-color:var(--accent); color:var(--accent2); background:rgba(108,99,255,.12); }
+.act-btn.del:hover  { border-color:var(--red);    color:var(--red);     background:rgba(244,63,94,.12); }
+
+/* ═══ SEARCH ═══ */
+.search-wrap { position:relative; flex:1; max-width:320px; }
+.search-wrap .search-icon { position:absolute; left:11px; top:50%; transform:translateY(-50%); color:var(--muted); pointer-events:none; width:14px; height:14px; }
+.search-wrap input {
+  width:100%; background:var(--surface2); border:1px solid var(--border2);
+  border-radius:10px; padding:8px 32px; color:var(--text);
+  font-family:'DM Sans',sans-serif; font-size:13px; outline:none;
+  transition:border-color .16s, box-shadow .16s;
+}
+.search-wrap input:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(108,99,255,.12); }
+.search-wrap input::placeholder { color:var(--muted); }
+.search-clear {
+  position:absolute; right:9px; top:50%; transform:translateY(-50%);
+  background:none; border:none; color:var(--muted); cursor:pointer;
+  display:none; padding:2px; transition:color .15s; line-height:0;
+}
+.search-clear:hover { color:var(--text); }
+.search-clear svg { width:12px; height:12px; }
+
+/* ═══ FORM ═══ */
+.form-section { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:22px; }
+.form-section.financial { border-color:rgba(108,99,255,.18); background:rgba(108,99,255,.025); }
+.form-section-title {
+  font-family:'Syne',sans-serif; font-size:10.5px; font-weight:700;
+  text-transform:uppercase; letter-spacing:.1em; color:var(--muted);
+  margin-bottom:18px; display:flex; align-items:center; gap:8px;
+}
+.form-section-title.fin { color:var(--accent2); }
+.form-section-title::after { content:''; flex:1; height:1px; background:var(--border); }
+.form-section-title svg { width:12px; height:12px; }
+
+.field { display:flex; flex-direction:column; }
+.field label {
+  font-size:11px; font-weight:700; color:var(--muted2); margin-bottom:6px;
+  text-transform:uppercase; letter-spacing:.06em;
+}
+.field input, .field select {
+  width:100%; background:var(--surface2); border:1px solid var(--border2);
+  border-radius:10px; padding:10px 14px; color:var(--text);
+  font-family:'DM Sans',sans-serif; font-size:14px; outline:none;
+  transition:border-color .16s, box-shadow .16s, background .16s;
+  -webkit-appearance:none; appearance:none;
+}
+.field input::placeholder { color:var(--muted); }
+.field input:focus, .field select:focus {
+  border-color:var(--accent); box-shadow:0 0 0 3px rgba(108,99,255,.13);
+  background:rgba(108,99,255,.04);
+}
+.field select option { background:#18182a; }
+
+.field-icon { position:relative; }
+.field-icon .icon { position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--muted); pointer-events:none; width:14px; height:14px; }
+.field-icon input { padding-left:38px; }
+
+.field-highlight input {
+  border-color:rgba(108,99,255,.4); background:rgba(108,99,255,.06);
+  color:var(--accent2); font-weight:700; font-size:15px;
+}
+.field-highlight input:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(108,99,255,.18); }
+
+.commission-hint {
+  margin-top:10px; padding:10px 14px;
+  background:rgba(108,99,255,.08); border-radius:9px;
+  border:1px solid rgba(108,99,255,.15);
+  display:flex; gap:8px; align-items:center;
+  font-size:12px; animation:fadeIn .2s ease;
+}
+.commission-hint strong { color:var(--accent2); font-size:13px; }
+
+/* ═══ RENEWAL / PENDING ITEMS ═══ */
+.renewal-item, .pending-item {
+  display:flex; align-items:center; gap:11px;
+  background:var(--surface2); border:1px solid var(--border);
+  border-radius:11px; padding:11px 13px; transition:border-color .14s;
+}
+.pending-item { justify-content:space-between; }
+.renewal-item:hover  { border-color:rgba(249,115,22,.3); }
+.pending-item:hover  { border-color:rgba(249,115,22,.3); }
+.renewal-dot { width:7px; height:7px; border-radius:50%; background:var(--orange); flex-shrink:0; box-shadow:0 0 6px rgba(249,115,22,.6); }
+
+.mark-paid-btn {
+  font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.05em;
+  background:rgba(249,115,22,.14); color:var(--orange);
+  border:1px solid rgba(249,115,22,.25); border-radius:6px;
+  padding:4px 9px; cursor:pointer; transition:all .14s;
+  font-family:'DM Sans',sans-serif; margin-top:5px;
+}
+.mark-paid-btn:hover { background:var(--orange); color:#fff; }
+
+/* ═══ EXPENSE FORM ═══ */
+.expense-form-row {
+  display:flex; gap:9px; align-items:center;
+  padding:14px 18px; background:rgba(244,63,94,.03); border-bottom:1px solid var(--border);
+}
+.expense-form-row input {
+  background:var(--surface2); border:1px solid var(--border2);
+  border-radius:9px; padding:8px 12px; color:var(--text);
+  font-family:'DM Sans',sans-serif; font-size:13px; outline:none;
+  transition:border-color .14s;
+}
+.expense-form-row input:focus { border-color:var(--red); }
+.expense-form-row input::placeholder { color:var(--muted); }
+.add-exp-btn {
+  width:34px; height:34px; flex-shrink:0;
+  background:rgba(244,63,94,.14); color:var(--red);
+  border:1px solid rgba(244,63,94,.25); border-radius:9px;
+  cursor:pointer; display:flex; align-items:center; justify-content:center;
+  transition:all .14s;
+}
+.add-exp-btn:hover { background:var(--red); color:#fff; }
+.add-exp-btn svg { width:15px; height:15px; }
+
+/* ═══ NOTIFICATION ═══ */
+.notif {
+  position:fixed; top:18px; right:18px; z-index:9999;
+  display:flex; align-items:center; gap:10px;
+  padding:12px 16px; border-radius:12px;
+  font-size:13.5px; font-weight:500;
+  animation:slideIn .25s ease;
+  box-shadow:0 8px 40px rgba(0,0,0,.5); max-width:320px;
+}
+.notif.success { background:rgba(34,211,165,.1); color:var(--green); border:1px solid rgba(34,211,165,.25); }
+.notif.error   { background:rgba(244,63,94,.1);  color:var(--red);   border:1px solid rgba(244,63,94,.25); }
+.notif svg { width:15px; height:15px; flex-shrink:0; }
+
+/* ═══ MODAL ═══ */
+.modal-overlay {
+  position:fixed; inset:0; z-index:8888;
+  background:rgba(0,0,0,.6); backdrop-filter:blur(4px);
+  display:flex; align-items:center; justify-content:center;
+  animation:fadeIn .18s ease;
+}
+.modal-box {
+  background:var(--surface); border:1px solid var(--border2);
+  border-radius:18px; padding:28px; width:360px;
+  box-shadow:0 32px 80px rgba(0,0,0,.6);
+  animation:scaleIn .2s ease;
+}
+.modal-icon {
+  width:48px; height:48px; border-radius:14px;
+  background:rgba(244,63,94,.1); border:1px solid rgba(244,63,94,.2);
+  display:flex; align-items:center; justify-content:center; margin-bottom:16px;
+}
+.modal-icon svg { width:22px; height:22px; color:var(--red); }
+.modal-actions { display:flex; gap:9px; justify-content:flex-end; margin-top:22px; }
+
+/* ═══ EMPTY STATE ═══ */
+.empty-state {
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  padding:56px 0; color:var(--muted); gap:10px;
+}
+.empty-state svg { opacity:.12; width:32px; height:32px; }
+.empty-state span { font-size:13px; }
+
+/* ═══ LOADER ═══ */
+.loader-wrap {
+  height:60vh; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:14px; color:var(--muted);
+}
+.spinner { animation:spin 1s linear infinite; color:var(--accent); width:34px; height:34px; }
+
+/* ═══ HAMBURGER ═══ */
+.hamburger {
+  display:none; position:fixed; top:14px; left:14px; z-index:101;
+  width:36px; height:36px; border-radius:10px;
+  background:var(--surface); border:1px solid var(--border2);
+  color:var(--text); cursor:pointer;
+  align-items:center; justify-content:center; transition:all .15s;
+}
+.hamburger:hover { background:var(--surface2); }
+.hamburger svg { width:16px; height:16px; }
+
+.mobile-overlay {
+  display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:99;
+  animation:fadeIn .2s ease;
+}
+
+/* ═══ SCROLLABLE PANEL ═══ */
+.scroll-panel { flex:1; overflow-y:auto; padding:12px; display:flex; flex-direction:column; gap:7px; }
+
+/* ═══ INSURER BREAKDOWN ═══ */
+.insurer-row { display:flex; flex-direction:column; }
+.insurer-row-header { display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px; }
+.insurer-name { color:var(--muted2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:110px; }
+.insurer-count { font-weight:700; color:var(--accent2); }
+
+/* ═══ RESPONSIVE ═══ */
+@media (max-width: 860px) {
+  .hamburger { display:flex; }
+  .sidebar { position:fixed; transform:translateX(-100%); height:100vh; }
+  .sidebar.open { transform:translateX(0); box-shadow:4px 0 40px rgba(0,0,0,.5); }
+  .mobile-overlay.show { display:block; }
+  .main { padding:64px 16px 24px; }
+  .grid-4, .grid-3 { grid-template-columns:repeat(2,1fr); }
+  .grid-2, .grid-2-1, .grid-1-1 { grid-template-columns:1fr; }
+  .page-header { flex-direction:column; align-items:flex-start; gap:12px; }
+  .page-header-actions { width:100%; }
+  .search-wrap { max-width:100%; }
+}
+@media (max-width: 480px) {
+  .grid-4 { grid-template-columns:repeat(2,1fr); }
+  .stat-value { font-size:20px; }
+  .perf-val { font-size:26px; }
+  div[style*="grid-template-columns:repeat(4,1fr)"] { grid-template-columns:repeat(2,1fr) !important; }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ NOTIFICATION ═══ -->
+<div id="notif" class="notif" style="display:none"></div>
+
+<!-- ═══ CONFIRM MODAL ═══ -->
+<div id="modal" class="modal-overlay" style="display:none">
+  <div class="modal-box">
+    <div class="modal-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    </div>
+    <div class="syne" style="font-size:17px;font-weight:700;margin-bottom:8px">Confirmar ação</div>
+    <div id="modal-msg" style="font-size:13.5px;color:var(--muted2);line-height:1.6"></div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button class="btn-danger" id="modal-confirm-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+        Excluir
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ HAMBURGER ═══ -->
+<button class="hamburger" id="hamburger" onclick="toggleSidebar()">
+  <svg id="ham-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+</button>
+<div class="mobile-overlay" id="mobile-overlay" onclick="toggleSidebar()"></div>
+
+<!-- ═══ APP ═══ -->
+<div class="app-wrap">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="logo-area">
+      <div style="display:flex;align-items:center;gap:11px">
+        <div class="logo-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+        </div>
+        <div>
+          <div class="syne" style="font-size:16px;font-weight:800;letter-spacing:-.03em">
+            Corretor<span style="color:var(--accent2)">Pro</span>
+          </div>
+          <div style="font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;font-weight:600">Gestor de Negócios</div>
+        </div>
+      </div>
+    </div>
+
+    <nav style="padding:10px;flex:1;display:flex;flex-direction:column;gap:3px;overflow-y:auto">
+      <div class="nav-section-label">Principal</div>
+      <button class="nav-btn active" data-tab="dashboard" onclick="navigate('dashboard')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        Dashboard
+      </button>
+      <button class="nav-btn" data-tab="new" id="nav-new" onclick="navigate('new')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+        Novo Seguro
+      </button>
+      <button class="nav-btn" data-tab="list" onclick="navigate('list')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+        Apólices
+        <span class="badge" id="badge-list">0</span>
+      </button>
+      <button class="nav-btn" data-tab="cashflow" onclick="navigate('cashflow')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+        Financeiro
+      </button>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="user-card">
+        <div class="user-avatar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;font-weight:600;color:var(--muted2)">Corretor</div>
+          <div style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:3px">
+            <div class="pulse-dot"></div> Online
+          </div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+
+    <!-- ── DASHBOARD ── -->
+    <section class="page active" id="page-dashboard">
+      <div class="page-header">
+        <div>
+          <h2 class="page-title syne">Visão Geral</h2>
+          <p class="page-sub">Dados em tempo real · Sincronizado localmente</p>
+        </div>
+        <div class="page-header-actions">
+          <button class="btn-primary" onclick="navigate('new')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+            Novo Seguro
+          </button>
+        </div>
+      </div>
+
+      <!-- KPIs -->
+      <div class="grid-4" style="margin-bottom:22px" id="dash-kpis"></div>
+
+      <!-- Bottom row -->
+      <div class="grid-2-1" style="align-items:start">
+        <!-- Desempenho -->
+        <div class="perf-card" id="dash-perf"></div>
+        <!-- Renovações -->
+        <div class="table-wrap" style="display:flex;flex-direction:column">
+          <div style="padding:16px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
+            <svg style="width:15px;height:15px;color:var(--orange)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <span class="syne" style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted2)">Renovações · 30d</span>
+            <span class="pill pill-orange" id="renewal-badge" style="margin-left:auto;display:none"></span>
+          </div>
+          <div class="scroll-panel" id="renewals-list" style="max-height:340px"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── FORM (Novo / Editar) ── -->
+    <section class="page" id="page-new">
+      <div style="max-width:800px;margin:0 auto">
+        <div class="page-header">
+          <div>
+            <h2 class="page-title syne" id="form-title">Novo Seguro</h2>
+            <p class="page-sub" id="form-sub">Preencha os dados para cadastrar</p>
+          </div>
+          <button class="btn-ghost" id="btn-cancel-edit" style="display:none" onclick="cancelEdit()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            Cancelar
+          </button>
+        </div>
+
+        <form id="policy-form" onsubmit="handleSubmit(event)" style="display:flex;flex-direction:column;gap:14px">
+
+          <!-- Cliente -->
+          <div class="form-section">
+            <div class="form-section-title">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              Dados do Cliente
+            </div>
+            <div class="grid-2" style="margin-bottom:12px">
+              <div class="field field-icon">
+                <label>Nome Completo / Empresa</label>
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <input required type="text" name="clientName" id="f-clientName" placeholder="Ex: João da Silva"/>
+              </div>
+              <div class="field field-icon">
+                <label>CPF / CNPJ</label>
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+                <input required type="text" name="cpf" id="f-cpf" placeholder="Apenas números"/>
+              </div>
+            </div>
+            <div class="field field-icon">
+              <label>Contato (Telefone / WhatsApp)</label>
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 01.22 1.22 2 2 0 012.18 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 7.91a16 16 0 006.06 6.06l1.27-.52a2 2 0 012.11.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+              <input required type="text" name="clientContact" id="f-clientContact" placeholder="Ex: (11) 99999-9999"/>
+            </div>
+          </div>
+
+          <!-- Veículo -->
+          <div class="form-section">
+            <div class="form-section-title">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7l2-4h14l2 4"/><path d="M1 7h22v4H1z"/><path d="M5 11v6"/><path d="M19 11v6"/><circle cx="7" cy="19" r="2"/><circle cx="17" cy="19" r="2"/></svg>
+              Veículo & Apólice
+            </div>
+            <div class="grid-2" style="margin-bottom:12px">
+              <div class="field field-icon">
+                <label>Seguradora</label>
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                <input required type="text" name="insurer" id="f-insurer" placeholder="Ex: Porto, SulAmérica..."/>
+              </div>
+              <div class="field field-icon">
+                <label>Indicador / Parceiro <span style="font-weight:400;text-transform:none;color:var(--muted);font-size:10px">(opcional)</span></label>
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <input type="text" name="referrer" id="f-referrer" placeholder="Quem indicou?"/>
+              </div>
+            </div>
+            <div class="grid-2" style="margin-bottom:12px">
+              <div class="field field-icon">
+                <label>Modelo do Veículo</label>
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7l2-4h14l2 4"/><path d="M1 7h22v4H1z"/><path d="M5 11v6"/><path d="M19 11v6"/><circle cx="7" cy="19" r="2"/><circle cx="17" cy="19" r="2"/></svg>
+                <input required type="text" name="vehicleModel" id="f-vehicleModel" placeholder="Ex: Honda CG 160 Titan"/>
+              </div>
+              <div class="field field-icon">
+                <label>Placa ou Chassi</label>
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>
+                <input required type="text" name="vehiclePlate" id="f-vehiclePlate" placeholder="Ex: ABC-1234" style="text-transform:uppercase"/>
+              </div>
+            </div>
+            <div class="grid-2">
+              <div class="field field-icon">
+                <label>Início da Vigência</label>
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                <input required type="date" name="validityStart" id="f-validityStart" onchange="autoEndDate()"/>
+              </div>
+              <div class="field field-icon">
+                <label>Fim da Vigência <span style="font-size:10px;font-weight:500;color:var(--accent2);text-transform:none">· auto 1 ano</span></label>
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                <input required type="date" name="validityEnd" id="f-validityEnd"/>
+              </div>
+            </div>
+          </div>
+
+          <!-- Financeiro -->
+          <div class="form-section financial">
+            <div class="form-section-title fin">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+              Dados Financeiros
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:12px" id="fin-grid">
+              <div class="field">
+                <label>Prêmio Total (R$)</label>
+                <input required type="number" step="0.01" name="premiumAmount" id="f-premiumAmount" placeholder="0,00" oninput="calcCommission()"/>
+              </div>
+              <div class="field">
+                <label>% Com. Seguradora</label>
+                <input required type="number" step="0.1" name="commissionRate" id="f-commissionRate" placeholder="Ex: 15" oninput="calcCommission()"/>
+              </div>
+              <div class="field">
+                <label>Valor da Parcela (R$)</label>
+                <input required type="number" step="0.01" name="monthlyInstallment" id="f-monthlyInstallment" placeholder="0,00"/>
+              </div>
+              <div class="field">
+                <label>Forma de Pagamento</label>
+                <select required name="paymentMethod" id="f-paymentMethod">
+                  <option value="">Selecione...</option>
+                  <option>Cartão de Crédito</option>
+                  <option>Boleto Bancário</option>
+                  <option>Pix</option>
+                  <option>Débito em Conta</option>
+                </select>
+              </div>
+            </div>
+            <div class="grid-2">
+              <div class="field field-highlight">
+                <label style="color:var(--accent2)">⚡ Seu Ganho Nesse Seguro (R$)</label>
+                <input required type="number" step="0.01" name="brokerEarning" id="f-brokerEarning" placeholder="Valor que vai pro seu bolso"/>
+              </div>
+              <div class="field">
+                <label>Status da Comissão</label>
+                <select name="commissionStatus" id="f-commissionStatus">
+                  <option value="Pendente">A Receber (Pendente)</option>
+                  <option value="Recebida">Já Recebido (Pago)</option>
+                </select>
+              </div>
+            </div>
+            <div class="commission-hint" id="commission-hint" style="display:none">
+              <svg style="width:13px;height:13px;color:var(--accent2)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              <span style="color:var(--muted)">Comissão calculada automaticamente:</span>
+              <strong id="commission-hint-val"></strong>
+            </div>
+          </div>
+
+          <div style="display:flex;justify-content:flex-end;gap:9px;padding-top:2px">
+            <button type="button" class="btn-ghost" id="btn-cancel2" style="display:none" onclick="cancelEdit()">Cancelar</button>
+            <button type="submit" class="btn-primary" id="btn-submit">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+              <span id="btn-submit-label">Cadastrar Seguro</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- ── LIST ── -->
+    <section class="page" id="page-list">
+      <div class="page-header">
+        <div>
+          <h2 class="page-title syne">Apólices</h2>
+          <p class="page-sub" id="list-sub">0 registros</p>
+        </div>
+        <div class="page-header-actions">
+          <div class="search-wrap">
+            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="search-input" placeholder="Cliente, placa, CPF..." oninput="renderList()"/>
+            <button class="search-clear" id="search-clear" onclick="clearSearch()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+          <button class="btn-ghost" onclick="exportCSV()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            CSV
+          </button>
+          <button class="btn-primary" onclick="navigate('new')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+            Novo
+          </button>
+        </div>
+      </div>
+      <!-- Filter chips -->
+      <div style="display:flex;gap:7px;margin-bottom:16px;flex-wrap:wrap" id="filter-chips">
+        <button class="filter-chip f-all"    data-filter="Todos"    onclick="setFilter('Todos')">Todos <span id="fc-all">0</span></button>
+        <button class="filter-chip"          data-filter="Ativo"    onclick="setFilter('Ativo')">Ativo <span id="fc-ativo">0</span></button>
+        <button class="filter-chip"          data-filter="A Vencer" onclick="setFilter('A Vencer')">A Vencer <span id="fc-avencer">0</span></button>
+        <button class="filter-chip"          data-filter="Vencido"  onclick="setFilter('Vencido')">Vencido <span id="fc-vencido">0</span></button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Cliente</th>
+              <th>Veículo</th>
+              <th>Seguradora</th>
+              <th>Vigência</th>
+              <th>Status</th>
+              <th style="color:var(--accent2)">Ganho</th>
+              <th style="text-align:center">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="list-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ── CASHFLOW ── -->
+    <section class="page" id="page-cashflow">
+      <div class="page-header">
+        <div>
+          <h2 class="page-title syne">Financeiro</h2>
+          <p class="page-sub">Controle de entradas e saídas</p>
+        </div>
+      </div>
+      <!-- KPIs financeiros -->
+      <div class="grid-4" style="margin-bottom:20px" id="cash-kpis"></div>
+      <div class="grid-1-1">
+        <!-- Pendentes -->
+        <div class="table-wrap" style="display:flex;flex-direction:column;max-height:460px">
+          <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
+            <svg style="width:14px;height:14px;color:var(--orange)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <span class="syne" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted2)">Comissões Pendentes</span>
+            <span class="pill pill-orange" id="pending-badge" style="margin-left:auto">0</span>
+          </div>
+          <div class="scroll-panel" id="pending-list"></div>
+        </div>
+        <!-- Despesas -->
+        <div class="table-wrap" style="display:flex;flex-direction:column;max-height:460px">
+          <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
+            <svg style="width:14px;height:14px;color:var(--red)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>
+            <span class="syne" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted2)">Despesas</span>
+            <span class="pill pill-red" id="expense-badge" style="margin-left:auto">0</span>
+          </div>
+          <form class="expense-form-row" onsubmit="addExpense(event)">
+            <input required type="text" id="exp-desc" placeholder="Descrição (ex: panfletos)..." style="flex:1"/>
+            <input required type="number" step="0.01" id="exp-amount" placeholder="R$" style="width:84px"/>
+            <button type="submit" class="add-exp-btn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+            </button>
+          </form>
+          <div class="scroll-panel" id="expense-list"></div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   STORAGE — LocalStorage como fallback (funciona sem Firebase)
+═══════════════════════════════════════════════════════════════ */
+const LS_KEY_POLICIES  = 'cp_policies';
+const LS_KEY_EXPENSES  = 'cp_expenses';
+
+function loadLS(key)       { try { return JSON.parse(localStorage.getItem(key)) || []; } catch(e){ return []; } }
+function saveLS(key, data) { localStorage.setItem(key, JSON.stringify(data)); }
+
+/* ═══════════════════════════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════════════════════════ */
+let policies    = loadLS(LS_KEY_POLICIES);
+let expenses    = loadLS(LS_KEY_EXPENSES);
+let editingId   = null;
+let activeTab   = 'dashboard';
+let statusFilter= 'Todos';
+let modalCb     = null;
+
+/* ═══════════════════════════════════════════════════════════════
+   FIREBASE SYNC (opcional — só ativa se configurado)
+═══════════════════════════════════════════════════════════════ */
+window.addEventListener('load', () => {
+  if (!window._fb || window._fbOffline) { render(); return; }
+  const { auth, db, collection, onSnapshot, APP_ID } = window._fb;
+
+  window._fb.auth.onAuthStateChanged = (cb) => {
+    // handled by firebase module already; just call render
+  };
+
+  // Listen for auth state — when ready, subscribe to Firestore
+  import("https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js").then(m => {
+    m.onAuthStateChanged(window._fb.auth, user => {
+      if (!user) return render();
+      window._fbUser = user;
+      const polRef = window._fb.collection(window._fb.db, 'artifacts', window._fb.APP_ID, 'users', user.uid, 'policies');
+      const expRef = window._fb.collection(window._fb.db, 'artifacts', window._fb.APP_ID, 'users', user.uid, 'expenses');
+      window._fb.onSnapshot(polRef, snap => {
+        policies = snap.docs.map(d => ({id:d.id,...d.data()})).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+        saveLS(LS_KEY_POLICIES, policies);
+        render();
+      });
+      window._fb.onSnapshot(expRef, snap => {
+        expenses = snap.docs.map(d => ({id:d.id,...d.data()})).sort((a,b)=>new Date(b.date)-new Date(a.date));
+        saveLS(LS_KEY_EXPENSES, expenses);
+        render();
+      });
+    });
+  });
+  render();
+});
+
+/* ═══════════════════════════════════════════════════════════════
+   UTILS
+═══════════════════════════════════════════════════════════════ */
+const fmt = v => new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(v||0);
+const fmtDate = d => { if(!d) return '—'; const [y,m,day]=d.split('-'); return `${day}/${m}/${y}`; };
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
+
+function getStatus(endDate) {
+  if (!endDate) return { label:'Sem data', cls:'pill-red', icon:'⚠', daysLeft:null };
+  const today = new Date(); today.setHours(0,0,0,0);
+  const end   = new Date(endDate);
+  const diff  = Math.ceil((end - today) / 86400000);
+  if (diff < 0)   return { label:'Vencido',  cls:'pill-red',    daysLeft:diff };
+  if (diff <= 30) return { label:'A Vencer', cls:'pill-orange', daysLeft:diff };
+  return              { label:'Ativo',     cls:'pill-green',  daysLeft:diff };
+}
+
+function pillHTML(status) {
+  const icons = {
+    'Vencido':  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/></svg>',
+    'A Vencer': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+    'Ativo':    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
+  };
+  return `<span class="pill ${status.cls}">${icons[status.label]||''} ${status.label}</span>`;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   NAVIGATION
+═══════════════════════════════════════════════════════════════ */
+function navigate(tab) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  const page = document.getElementById('page-'+tab);
+  if (page) { page.classList.add('active'); page.style.animation='none'; page.offsetHeight; page.style.animation=''; }
+  const btn = document.querySelector(`[data-tab="${tab}"]`);
+  if (btn) btn.classList.add('active');
+  activeTab = tab;
+  // Close sidebar on mobile
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('mobile-overlay').classList.remove('show');
+  render();
+}
+
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('mobile-overlay').classList.toggle('show');
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   NOTIFICATION
+═══════════════════════════════════════════════════════════════ */
+let notifTimer;
+function showNotif(msg, type='success') {
+  const el = document.getElementById('notif');
+  const icon = type === 'error'
+    ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/></svg>'
+    : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>';
+  el.className = `notif ${type}`;
+  el.innerHTML = icon + msg;
+  el.style.display = 'flex';
+  clearTimeout(notifTimer);
+  notifTimer = setTimeout(() => el.style.display='none', 3400);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MODAL
+═══════════════════════════════════════════════════════════════ */
+function openModal(msg, cb) {
+  document.getElementById('modal-msg').textContent = msg;
+  document.getElementById('modal').style.display = 'flex';
+  modalCb = cb;
+  document.getElementById('modal-confirm-btn').onclick = () => { closeModal(); cb(); };
+}
+function closeModal() { document.getElementById('modal').style.display='none'; }
+
+/* ═══════════════════════════════════════════════════════════════
+   FORM HELPERS
+═══════════════════════════════════════════════════════════════ */
+function autoEndDate() {
+  const start = document.getElementById('f-validityStart').value;
+  if (!start) return;
+  const d = new Date(start); d.setFullYear(d.getFullYear()+1);
+  document.getElementById('f-validityEnd').value = d.toISOString().split('T')[0];
+}
+
+function calcCommission() {
+  const premium = parseFloat(document.getElementById('f-premiumAmount').value) || 0;
+  const rate    = parseFloat(document.getElementById('f-commissionRate').value) || 0;
+  const hint    = document.getElementById('commission-hint');
+  if (premium > 0 && rate > 0) {
+    const val = (premium * rate) / 100;
+    document.getElementById('f-brokerEarning').value = val.toFixed(2);
+    document.getElementById('commission-hint-val').textContent = fmt(val);
+    hint.style.display = 'flex';
+  } else {
+    hint.style.display = 'none';
+  }
+}
+
+function clearForm() {
+  ['clientName','cpf','clientContact','insurer','vehicleModel','vehiclePlate',
+   'validityStart','validityEnd','referrer','premiumAmount','commissionRate',
+   'brokerEarning','monthlyInstallment'].forEach(f => document.getElementById('f-'+f).value='');
+  document.getElementById('f-paymentMethod').value='';
+  document.getElementById('f-commissionStatus').value='Pendente';
+  document.getElementById('commission-hint').style.display='none';
+}
+
+function populateForm(p) {
+  const fields = ['clientName','cpf','clientContact','insurer','vehicleModel','vehiclePlate',
+    'validityStart','validityEnd','referrer','premiumAmount','commissionRate',
+    'brokerEarning','monthlyInstallment','paymentMethod','commissionStatus'];
+  fields.forEach(f => { const el = document.getElementById('f-'+f); if(el) el.value = p[f]||''; });
+}
+
+function setEditMode(isEdit) {
+  document.getElementById('form-title').textContent = isEdit ? 'Editar Seguro' : 'Novo Seguro';
+  document.getElementById('form-sub').textContent   = isEdit ? 'Atualize os dados do seguro' : 'Preencha os dados para cadastrar';
+  document.getElementById('btn-cancel-edit').style.display = isEdit ? 'flex' : 'none';
+  document.getElementById('btn-cancel2').style.display     = isEdit ? 'flex' : 'none';
+  document.getElementById('btn-submit-label').textContent  = isEdit ? 'Guardar Alterações' : 'Cadastrar Seguro';
+  document.querySelector('#nav-new span').textContent      = isEdit ? 'Editar Seguro' : 'Novo Seguro';
+}
+
+function cancelEdit() { editingId=null; clearForm(); setEditMode(false); navigate('list'); }
+
+/* ═══════════════════════════════════════════════════════════════
+   CRUD — POLICIES
+═══════════════════════════════════════════════════════════════ */
+async function handleSubmit(e) {
+  e.preventDefault();
+  const get = id => document.getElementById('f-'+id).value;
+  const premium = parseFloat(get('premiumAmount'))||0;
+  const rate    = parseFloat(get('commissionRate'))||0;
+  const p = {
+    clientName: get('clientName'), cpf: get('cpf'), clientContact: get('clientContact'),
+    insurer: get('insurer'), vehicleModel: get('vehicleModel'), vehiclePlate: get('vehiclePlate').toUpperCase(),
+    validityStart: get('validityStart'), validityEnd: get('validityEnd'), referrer: get('referrer'),
+    premiumAmount: premium, commissionRate: rate,
+    commissionAmount: (premium*rate)/100,
+    brokerEarning: parseFloat(get('brokerEarning'))||0,
+    monthlyInstallment: parseFloat(get('monthlyInstallment'))||0,
+    paymentMethod: get('paymentMethod'), commissionStatus: get('commissionStatus'),
+  };
+
+  // Try Firebase first, fall back to localStorage
+  if (window._fb && window._fbUser && !window._fbOffline) {
+    try {
+      const { db, collection, doc, addDoc, updateDoc, APP_ID } = window._fb;
+      const uid2 = window._fbUser.uid;
+      const colRef = collection(db,'artifacts',APP_ID,'users',uid2,'policies');
+      if (editingId) {
+        await updateDoc(doc(db,'artifacts',APP_ID,'users',uid2,'policies',editingId), p);
+      } else {
+        await addDoc(colRef, {...p, createdAt:Date.now()});
+      }
+      showNotif(editingId ? 'Seguro atualizado!' : 'Seguro cadastrado!');
+      editingId=null; clearForm(); setEditMode(false); navigate('list'); return;
+    } catch(err){ console.warn(err); }
+  }
+
+  // localStorage fallback
+  if (editingId) {
+    const idx = policies.findIndex(x=>x.id===editingId);
+    if (idx>-1) policies[idx] = {...policies[idx],...p};
+    showNotif('Seguro atualizado!');
+  } else {
+    policies.unshift({...p, id:uid(), createdAt:Date.now()});
+    showNotif('Seguro cadastrado!');
+  }
+  saveLS(LS_KEY_POLICIES, policies);
+  editingId=null; clearForm(); setEditMode(false); navigate('list');
+}
+
+function editPolicy(id) {
+  const p = policies.find(x=>x.id===id);
+  if (!p) return;
+  editingId = id;
+  populateForm(p);
+  setEditMode(true);
+  navigate('new');
+}
+
+function deletePolicy(id) {
+  openModal('Este registro será excluído permanentemente. Essa ação não pode ser desfeita.', async () => {
+    if (window._fb && window._fbUser && !window._fbOffline) {
+      try {
+        const { db, doc, deleteDoc, APP_ID } = window._fb;
+        await deleteDoc(doc(db,'artifacts',APP_ID,'users',window._fbUser.uid,'policies',id));
+        showNotif('Registro excluído.'); return;
+      } catch(err){ console.warn(err); }
+    }
+    policies = policies.filter(x=>x.id!==id);
+    saveLS(LS_KEY_POLICIES, policies);
+    showNotif('Registro excluído.');
+    render();
+  });
+}
+
+async function markAsPaid(id) {
+  if (window._fb && window._fbUser && !window._fbOffline) {
+    try {
+      const { db, doc, updateDoc, APP_ID } = window._fb;
+      await updateDoc(doc(db,'artifacts',APP_ID,'users',window._fbUser.uid,'policies',id), {commissionStatus:'Recebida'});
+      showNotif('Comissão marcada como recebida!'); return;
+    } catch(err){ console.warn(err); }
+  }
+  const p = policies.find(x=>x.id===id);
+  if (p) p.commissionStatus = 'Recebida';
+  saveLS(LS_KEY_POLICIES, policies);
+  showNotif('Comissão marcada como recebida!');
+  render();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CRUD — EXPENSES
+═══════════════════════════════════════════════════════════════ */
+async function addExpense(e) {
+  e.preventDefault();
+  const desc   = document.getElementById('exp-desc').value.trim();
+  const amount = parseFloat(document.getElementById('exp-amount').value)||0;
+  const date   = new Date().toISOString().split('T')[0];
+
+  if (window._fb && window._fbUser && !window._fbOffline) {
+    try {
+      const { db, collection, addDoc, APP_ID } = window._fb;
+      await addDoc(collection(db,'artifacts',APP_ID,'users',window._fbUser.uid,'expenses'), {description:desc,amount,date,createdAt:Date.now()});
+      document.getElementById('exp-desc').value='';
+      document.getElementById('exp-amount').value='';
+      showNotif('Despesa registrada!'); return;
+    } catch(err){ console.warn(err); }
+  }
+
+  expenses.unshift({id:uid(), description:desc, amount, date, createdAt:Date.now()});
+  saveLS(LS_KEY_EXPENSES, expenses);
+  document.getElementById('exp-desc').value='';
+  document.getElementById('exp-amount').value='';
+  showNotif('Despesa registrada!');
+  render();
+}
+
+function deleteExpense(id) {
+  openModal('Excluir esta despesa permanentemente?', async () => {
+    if (window._fb && window._fbUser && !window._fbOffline) {
+      try {
+        const { db, doc, deleteDoc, APP_ID } = window._fb;
+        await deleteDoc(doc(db,'artifacts',APP_ID,'users',window._fbUser.uid,'expenses',id));
+        showNotif('Despesa excluída.'); return;
+      } catch(err){ console.warn(err); }
+    }
+    expenses = expenses.filter(x=>x.id!==id);
+    saveLS(LS_KEY_EXPENSES, expenses);
+    showNotif('Despesa excluída.');
+    render();
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   EXPORT CSV
+═══════════════════════════════════════════════════════════════ */
+function exportCSV() {
+  const filtered = getFiltered();
+  const headers = ['Cliente','CPF/CNPJ','Contato','Seguradora','Veículo','Placa','Início','Fim','Prêmio','% Comissão','Ganho','Parcela','Pagamento','Status'];
+  const rows = filtered.map(p=>[p.clientName,p.cpf,p.clientContact,p.insurer,p.vehicleModel,p.vehiclePlate,p.validityStart,p.validityEnd,p.premiumAmount,p.commissionRate,p.brokerEarning,p.monthlyInstallment,p.paymentMethod,p.commissionStatus]);
+  const csv = [headers,...rows].map(r=>r.map(c=>`"${c??''}"`).join(',')).join('\n');
+  const blob = new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download=`apolices_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click(); URL.revokeObjectURL(url);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   FILTER / SEARCH
+═══════════════════════════════════════════════════════════════ */
+function getFiltered() {
+  const q = (document.getElementById('search-input')?.value||'').toLowerCase();
+  return policies.filter(p => {
+    const matchQ = !q ||
+      (p.clientName||'').toLowerCase().includes(q) ||
+      (p.cpf||'').includes(q) ||
+      (p.vehiclePlate||'').toLowerCase().includes(q) ||
+      (p.insurer||'').toLowerCase().includes(q);
+    const matchF = statusFilter==='Todos' || getStatus(p.validityEnd).label===statusFilter;
+    return matchQ && matchF;
+  });
+}
+
+function setFilter(f) {
+  statusFilter = f;
+  document.querySelectorAll('.filter-chip').forEach(el => {
+    const map = { Todos:'f-all', Ativo:'f-green', 'A Vencer':'f-orange', Vencido:'f-red' };
+    el.className = 'filter-chip' + (el.dataset.filter===f ? ' '+map[f] : '');
+  });
+  renderList();
+}
+
+function clearSearch() {
+  document.getElementById('search-input').value='';
+  document.getElementById('search-clear').style.display='none';
+  renderList();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   RENDER
+═══════════════════════════════════════════════════════════════ */
+function render() {
+  renderBadge();
+  if (activeTab==='dashboard') renderDashboard();
+  if (activeTab==='list')      renderList();
+  if (activeTab==='cashflow')  renderCashflow();
+}
+
+function renderBadge() {
+  document.getElementById('badge-list').textContent = policies.length;
+}
+
+/* ── DASHBOARD ── */
+function renderDashboard() {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const activePolicies = policies.filter(p=>getStatus(p.validityEnd).label==='Ativo');
+  const paidEarnings   = policies.filter(p=>p.commissionStatus==='Recebida').reduce((a,c)=>a+(c.brokerEarning||0),0);
+  const pendingEarnings= policies.filter(p=>p.commissionStatus==='Pendente').reduce((a,c)=>a+(c.brokerEarning||0),0);
+  const totalExp       = expenses.reduce((a,c)=>a+c.amount,0);
+  const netProfit      = paidEarnings - totalExp;
+  const renewals       = policies.filter(p=>getStatus(p.validityEnd).label==='A Vencer').sort((a,b)=>getStatus(a.validityEnd).daysLeft-getStatus(b.validityEnd).daysLeft);
+
+  // KPIs
+  document.getElementById('dash-kpis').innerHTML = `
+    <div class="stat-card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div class="stat-icon" style="background:rgba(108,99,255,.15);color:var(--accent2)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+        </div>
+        <span style="font-size:11px;color:var(--muted);font-weight:600">total</span>
+      </div>
+      <div><div class="stat-label">Apólices Ativas</div><div class="stat-value">${activePolicies.length}</div></div>
+    </div>
+    <div class="stat-card accent">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div class="stat-icon" style="background:rgba(108,99,255,.2);color:var(--accent2)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+        </div>
+        <span style="font-size:10px;color:${netProfit>=0?'var(--green)':'var(--red)'};font-weight:700;text-transform:uppercase">${netProfit>=0?'positivo':'negativo'}</span>
+      </div>
+      <div><div class="stat-label" style="color:rgba(167,139,250,.7)">Lucro Líquido</div>
+      <div class="stat-value" style="color:${netProfit>=0?'var(--green)':'var(--red)'};font-size:22px">${fmt(netProfit)}</div></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon" style="background:rgba(249,115,22,.12);color:var(--orange)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      </div>
+      <div><div class="stat-label">A Receber</div><div class="stat-value" style="color:var(--orange);font-size:20px">${fmt(pendingEarnings)}</div></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon" style="background:rgba(244,63,94,.12);color:var(--red)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>
+      </div>
+      <div><div class="stat-label">Despesas</div><div class="stat-value" style="color:var(--red);font-size:20px">${fmt(totalExp)}</div></div>
+    </div>
+  `;
+
+  // Perf card
+  const cm=today.getMonth(), cy=today.getFullYear();
+  const thisMonth = policies.filter(p=>{
+    if(!p.validityStart) return false;
+    const [y,m]=p.validityStart.split('-');
+    return parseInt(y)===cy && parseInt(m)-1===cm;
+  });
+  const byInsurer={};
+  thisMonth.forEach(p=>{ byInsurer[p.insurer]=(byInsurer[p.insurer]||0)+1; });
+  let wd=0; const t2=new Date(cy,cm,1);
+  while(t2<=today){if(t2.getDay()!==0&&t2.getDay()!==6)wd++; t2.setDate(t2.getDate()+1);}
+  const avg=(thisMonth.length/(wd||1)).toFixed(1);
+  const monthEarnings=thisMonth.reduce((a,c)=>a+(c.brokerEarning||0),0);
+
+  const insurerRows = Object.entries(byInsurer).sort((a,b)=>b[1]-a[1]).map(([ins,cnt])=>{
+    const pct=(cnt/thisMonth.length*100).toFixed(0);
+    return `<div class="insurer-row">
+      <div class="insurer-row-header">
+        <span class="insurer-name" title="${ins}">${ins}</span>
+        <span class="insurer-count">${cnt}</span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('dash-perf').innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:20px">
+      <svg style="width:17px;height:17px;color:var(--accent2)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      <span class="syne" style="font-size:12px;font-weight:700;color:var(--accent2);text-transform:uppercase;letter-spacing:.07em">Desempenho · Mês Atual</span>
+    </div>
+    <div class="grid-3">
+      <div class="perf-metric">
+        <div class="perf-label">Fechados</div>
+        <div class="perf-val">${thisMonth.length}</div>
+        <div style="font-size:11px;color:rgba(167,139,250,.4);margin-top:4px">apólices</div>
+      </div>
+      <div class="perf-metric">
+        <div class="perf-label">Média/Dia</div>
+        <div style="display:flex;align-items:baseline;gap:3px">
+          <span class="perf-val">${avg}</span>
+          <span style="font-size:11px;color:rgba(167,139,250,.4)">útil</span>
+        </div>
+      </div>
+      <div class="perf-metric">
+        <div class="perf-label">Ganhos</div>
+        <div class="syne" style="font-size:16px;font-weight:800;color:var(--green)">${fmt(monthEarnings)}</div>
+        <div style="font-size:11px;color:rgba(167,139,250,.4);margin-top:4px">este mês</div>
+      </div>
+    </div>
+    ${insurerRows.length ? `
+    <div style="margin-top:16px;padding:14px 16px;background:rgba(255,255,255,.025);border-radius:10px;border:1px solid rgba(255,255,255,.05)">
+      <div style="font-size:10px;color:rgba(167,139,250,.5);font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">Por Seguradora</div>
+      <div style="display:flex;flex-direction:column;gap:7px">${insurerRows}</div>
+    </div>` : ''}
+  `;
+
+  // Renewals
+  const badge = document.getElementById('renewal-badge');
+  if (renewals.length) { badge.style.display='inline-flex'; badge.textContent=renewals.length; } else badge.style.display='none';
+  const rList = document.getElementById('renewals-list');
+  if (!renewals.length) {
+    rList.innerHTML = `<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg><span>Nenhuma renovação próxima</span></div>`;
+    return;
+  }
+  rList.innerHTML = renewals.map(p => {
+    const s=getStatus(p.validityEnd);
+    const dLabel = s.daysLeft===0?'vence hoje':`${s.daysLeft}d`;
+    return `<div class="renewal-item">
+      <div class="renewal-dot"></div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.clientName}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:1px">${p.vehicleModel||''}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div style="font-size:11px;font-weight:700;color:var(--orange)">${fmtDate(p.validityEnd)}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:2px">${dLabel}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* ── LIST ── */
+function renderList() {
+  const filtered = getFiltered();
+  const search   = document.getElementById('search-input')?.value||'';
+
+  document.getElementById('list-sub').textContent = `${filtered.length} de ${policies.length} registros`;
+  document.getElementById('search-clear').style.display = search ? 'block':'none';
+
+  // Update chip counts
+  const counts = { Todos:policies.length, Ativo:0, 'A Vencer':0, Vencido:0 };
+  policies.forEach(p => { const l=getStatus(p.validityEnd).label; if(counts[l]!==undefined) counts[l]++; });
+  document.getElementById('fc-all').textContent    = counts['Todos'];
+  document.getElementById('fc-ativo').textContent  = counts['Ativo'];
+  document.getElementById('fc-avencer').textContent= counts['A Vencer'];
+  document.getElementById('fc-vencido').textContent= counts['Vencido'];
+
+  const tbody = document.getElementById('list-body');
+  if (!filtered.length) {
+    tbody.innerHTML = `<tr><td colspan="7">
+      <div class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <span>Nenhum seguro encontrado</span>
+        ${(search||statusFilter!=='Todos')?'<button class="btn-ghost" style="margin-top:4px;font-size:12px" onclick="clearSearch();setFilter(\'Todos\')">Limpar filtros</button>':''}
+      </div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = filtered.map(p => {
+    const s = getStatus(p.validityEnd);
+    const daysNote = s.daysLeft!==null&&s.daysLeft>=0&&s.daysLeft<=30
+      ? `<div style="font-size:10px;color:var(--orange);font-weight:600;margin-top:3px">${s.daysLeft===0?'vence hoje!':s.daysLeft+'d restantes'}</div>` : '';
+    return `<tr>
+      <td>
+        <div style="font-weight:600;font-size:13.5px">${p.clientName}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px">${p.cpf||''}</div>
+        <div style="font-size:11px;color:var(--muted2);margin-top:2px;display:flex;align-items:center;gap:3px">
+          <svg style="width:9px;height:9px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 01.22 1.22 2 2 0 012.18 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 7.91a16 16 0 006.06 6.06l1.27-.52a2 2 0 012.11.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+          ${p.clientContact||'—'}
+        </div>
+      </td>
+      <td>
+        <div style="font-weight:600;font-size:13px">${p.vehicleModel||'—'}</div>
+        <span class="plate-chip" style="margin-top:4px;display:inline-block">${p.vehiclePlate||'SEM PLACA'}</span>
+      </td>
+      <td>
+        <div style="font-size:13px;color:var(--muted2)">${p.insurer||''}</div>
+        ${p.referrer?`<div style="font-size:11px;color:var(--muted);margin-top:2px">via ${p.referrer}</div>`:''}
+      </td>
+      <td>
+        <div style="font-size:12px;color:var(--muted)">${fmtDate(p.validityStart)}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:1px">até ${fmtDate(p.validityEnd)}</div>
+        ${daysNote}
+      </td>
+      <td>${pillHTML(s)}</td>
+      <td>
+        <div style="font-weight:700;font-size:14px;color:var(--accent2)">${fmt(p.brokerEarning)}</div>
+        <div style="font-size:11px;color:${p.commissionStatus==='Recebida'?'var(--green)':'var(--orange)'};margin-top:2px;font-weight:600">${p.commissionStatus}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:1px">Parcela: ${fmt(p.monthlyInstallment)}</div>
+      </td>
+      <td style="text-align:center">
+        <div style="display:flex;justify-content:center;gap:5px">
+          <button class="act-btn edit" onclick="editPolicy('${p.id}')" title="Editar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
+          <button class="act-btn del" onclick="deletePolicy('${p.id}')" title="Excluir">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+          </button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+/* ── CASHFLOW ── */
+function renderCashflow() {
+  const paidEarnings   = policies.filter(p=>p.commissionStatus==='Recebida').reduce((a,c)=>a+(c.brokerEarning||0),0);
+  const pendingEarnings= policies.filter(p=>p.commissionStatus==='Pendente').reduce((a,c)=>a+(c.brokerEarning||0),0);
+  const totalExp       = expenses.reduce((a,c)=>a+c.amount,0);
+  const netProfit      = paidEarnings - totalExp;
+
+  // KPIs
+  document.getElementById('cash-kpis').innerHTML = [
+    { label:'Ganhos Recebidos', value:fmt(paidEarnings),    color:'var(--green)',  bg:'rgba(34,211,165,.07)' },
+    { label:'A Receber',        value:fmt(pendingEarnings), color:'var(--orange)', bg:'rgba(249,115,22,.07)' },
+    { label:'Despesas Pagas',   value:fmt(totalExp),        color:'var(--red)',    bg:'rgba(244,63,94,.07)' },
+    { label:'Lucro Líquido',    value:fmt(netProfit),       color:netProfit>=0?'var(--green)':'var(--red)', accent:true },
+  ].map(c=>`
+    <div class="stat-card${c.accent?' accent':''}" style="${c.accent?'':'background:'+c.bg+';border:1px solid '+c.color+'22'}">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:${c.accent?'rgba(167,139,250,.55)':c.color};opacity:${c.accent?1:.75}">${c.label}</div>
+      <div class="stat-value" style="color:${c.color};font-size:18px">${c.value}</div>
+    </div>`).join('');
+
+  // Pending commissions
+  const pending = policies.filter(p=>p.commissionStatus==='Pendente');
+  document.getElementById('pending-badge').textContent = pending.length;
+  document.getElementById('pending-list').innerHTML = pending.length
+    ? pending.map(p=>`
+      <div class="pending-item">
+        <div>
+          <div style="font-size:13px;font-weight:600">${p.clientName}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">${p.vehicleModel||''} · ${p.insurer||''}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:14px;font-weight:700;color:var(--orange)">${fmt(p.brokerEarning)}</div>
+          <button class="mark-paid-btn" onclick="markAsPaid('${p.id}')">Marcar Pago</button>
+        </div>
+      </div>`).join('')
+    : `<div class="empty-state" style="padding:28px 0">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        <span>Tudo recebido!</span>
+      </div>`;
+
+  // Expenses
+  document.getElementById('expense-badge').textContent = expenses.length;
+  document.getElementById('expense-list').innerHTML = expenses.length
+    ? expenses.map(exp=>`
+      <div class="pending-item">
+        <div>
+          <div style="font-size:13px;font-weight:600">${exp.description}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:1px">${fmtDate(exp.date)}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:9px">
+          <span style="font-size:13px;font-weight:700;color:var(--red)">-${fmt(exp.amount)}</span>
+          <button onclick="deleteExpense('${exp.id}')"
+            style="background:none;border:none;color:var(--muted);cursor:pointer;padding:4px;border-radius:6px;display:flex;transition:color .14s"
+            onmouseenter="this.style.color='var(--red)'" onmouseleave="this.style.color='var(--muted)'" title="Excluir">
+            <svg style="width:13px;height:13px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+          </button>
+        </div>
+      </div>`).join('')
+    : `<div class="empty-state" style="padding:28px 0">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        <span>Nenhuma despesa registrada</span>
+      </div>`;
+}
+
+/* ── INITIAL RENDER ── */
+render();
+</script>
+</body>
+</html>
