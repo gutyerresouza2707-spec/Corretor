@@ -1073,12 +1073,16 @@ function populateForm(p) {
 }
 
 function setEditMode(isEdit) {
-  document.getElementById('form-title').textContent = isEdit ? 'Editar Seguro' : 'Novo Seguro';
-  document.getElementById('form-sub').textContent   = isEdit ? 'Atualize os dados do seguro' : 'Preencha os dados para cadastrar';
-  document.getElementById('btn-cancel-edit').style.display = isEdit ? 'flex' : 'none';
-  document.getElementById('btn-cancel2').style.display     = isEdit ? 'flex' : 'none';
-  document.getElementById('btn-submit-label').textContent  = isEdit ? 'Guardar Alterações' : 'Cadastrar Seguro';
-  document.querySelector('#nav-new span').textContent      = isEdit ? 'Editar Seguro' : 'Novo Seguro';
+  const set = (id, prop, value) => { const el = document.getElementById(id); if (el) el[prop] = value; };
+  set('form-title', 'textContent', isEdit ? 'Editar Seguro' : 'Novo Seguro');
+  set('form-sub',   'textContent', isEdit ? 'Atualize os dados do seguro' : 'Preencha os dados para cadastrar');
+  const btnCancelEdit = document.getElementById('btn-cancel-edit');
+  if (btnCancelEdit) btnCancelEdit.style.display = isEdit ? 'flex' : 'none';
+  const btnCancel2 = document.getElementById('btn-cancel2');
+  if (btnCancel2) btnCancel2.style.display = isEdit ? 'flex' : 'none';
+  set('btn-submit-label', 'textContent', isEdit ? 'Guardar Alterações' : 'Cadastrar Seguro');
+  const navNewSpan = document.querySelector('#nav-new span');
+  if (navNewSpan) navNewSpan.textContent = isEdit ? 'Editar Seguro' : 'Novo Seguro';
 }
 
 function cancelEdit() { editingId=null; clearForm(); setEditMode(false); navigate('list'); }
@@ -1543,3 +1547,4 @@ render();
 </script>
 </body>
 </html>
+
