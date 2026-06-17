@@ -7,38 +7,30 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
 
-<!-- Firebase -->
+<!-- Supabase -->
 <script type="module">
-  import { initializeApp }               from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-  import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot }
-    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-  /* ── CONFIGURE O FIREBASE AQUI ─────────────────────────────────────────
-     Cole as credenciais do seu projeto Firebase abaixo.
-     Acesse: https://console.firebase.google.com → Configurações do projeto → Seus apps
+  /* ── CONFIGURAÇÃO DO SUPABASE ──────────────────────────────────────────
+     Acesse: https://supabase.com/dashboard → Project Settings → API
   ──────────────────────────────────────────────────────────────────────── */
-  const firebaseConfig = {
-    apiKey:            "SUA_API_KEY",
-    authDomain:        "SEU_PROJETO.firebaseapp.com",
-    projectId:         "SEU_PROJETO",
-    storageBucket:     "SEU_PROJETO.appspot.com",
-    messagingSenderId: "SEU_SENDER_ID",
-    appId:             "SEU_APP_ID"
-  };
+  const SUPABASE_URL      = "https://tjbsjluxepqminyjsveb.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_LVzqfdhXFtiBKmmYmoxP7g_t6joQx6T";
 
-  const APP_ID = "corretor-pro";
-
-  const fbApp = initializeApp(firebaseConfig);
-  const auth  = getAuth(fbApp);
-  const db    = getFirestore(fbApp);
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   // Disponibiliza globalmente para o script principal
-  window._fb = { auth, db, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, APP_ID };
+  window._sb = { client: supabase };
 
-  signInAnonymously(auth).catch(e => {
-    console.warn("Firebase não configurado — usando localStorage:", e.message);
-    window._fbOffline = true;
+  supabase.auth.signInAnonymously().then(({ data, error }) => {
+    if (error) {
+      console.warn("Supabase não configurado — usando localStorage:", error.message);
+      window._sbOffline = true;
+      window.dispatchEvent(new Event('sb-ready'));
+      return;
+    }
+    window._sbUser = data.user;
+    window.dispatchEvent(new Event('sb-ready'));
   });
 </script>
 
@@ -879,7 +871,7 @@ tbody td { padding:13px 18px; font-size:13px; vertical-align:middle; }
 
 <script>
 /* ═══════════════════════════════════════════════════════════════
-   STORAGE — LocalStorage como fallback (funciona sem Firebase)
+   STORAGE — LocalStorage como fallback (funciona sem Supabase)
 ═══════════════════════════════════════════════════════════════ */
 const LS_KEY_POLICIES  = 'cp_policies';
 const LS_KEY_EXPENSES  = 'cp_expenses';
@@ -898,36 +890,71 @@ let statusFilter= 'Todos';
 let modalCb     = null;
 
 /* ═══════════════════════════════════════════════════════════════
-   FIREBASE SYNC (opcional — só ativa se configurado)
+   SUPABASE SYNC (opcional — só ativa se configurado)
 ═══════════════════════════════════════════════════════════════ */
-window.addEventListener('load', () => {
-  if (!window._fb || window._fbOffline) { render(); return; }
-  const { auth, db, collection, onSnapshot, APP_ID } = window._fb;
 
-  window._fb.auth.onAuthStateChanged = (cb) => {
-    // handled by firebase module already; just call render
+// Converte uma linha do banco (snake_case) para o formato usado no app (camelCase)
+function policyFromDB(p) {
+  return {
+    id: p.id, clientName: p.client_name, cpf: p.cpf, clientContact: p.client_contact,
+    insurer: p.insurer, vehicleModel: p.vehicle_model, vehiclePlate: p.vehicle_plate,
+    validityStart: p.validity_start, validityEnd: p.validity_end, referrer: p.referrer,
+    premiumAmount: p.premium_amount, commissionRate: p.commission_rate, commissionAmount: p.commission_amount,
+    brokerEarning: p.broker_earning, monthlyInstallment: p.monthly_installment,
+    paymentMethod: p.payment_method, commissionStatus: p.commission_status, createdAt: p.created_at,
   };
+}
+// Converte uma policy do app (camelCase) para o formato do banco (snake_case)
+function policyToDB(p) {
+  return {
+    client_name: p.clientName, cpf: p.cpf, client_contact: p.clientContact,
+    insurer: p.insurer, vehicle_model: p.vehicleModel, vehicle_plate: p.vehiclePlate,
+    validity_start: p.validityStart || null, validity_end: p.validityEnd || null, referrer: p.referrer,
+    premium_amount: p.premiumAmount, commission_rate: p.commissionRate, commission_amount: p.commissionAmount,
+    broker_earning: p.brokerEarning, monthly_installment: p.monthlyInstallment,
+    payment_method: p.paymentMethod, commission_status: p.commissionStatus,
+  };
+}
+function expenseFromDB(e) {
+  return { id: e.id, description: e.description, amount: e.amount, date: e.date, createdAt: e.created_at };
+}
 
-  // Listen for auth state — when ready, subscribe to Firestore
-  import("https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js").then(m => {
-    m.onAuthStateChanged(window._fb.auth, user => {
-      if (!user) return render();
-      window._fbUser = user;
-      const polRef = window._fb.collection(window._fb.db, 'artifacts', window._fb.APP_ID, 'users', user.uid, 'policies');
-      const expRef = window._fb.collection(window._fb.db, 'artifacts', window._fb.APP_ID, 'users', user.uid, 'expenses');
-      window._fb.onSnapshot(polRef, snap => {
-        policies = snap.docs.map(d => ({id:d.id,...d.data()})).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
-        saveLS(LS_KEY_POLICIES, policies);
-        render();
-      });
-      window._fb.onSnapshot(expRef, snap => {
-        expenses = snap.docs.map(d => ({id:d.id,...d.data()})).sort((a,b)=>new Date(b.date)-new Date(a.date));
-        saveLS(LS_KEY_EXPENSES, expenses);
-        render();
-      });
-    });
-  });
+async function loadFromSupabase() {
+  const sb = window._sb.client;
+  const { data: pols, error: polErr } = await sb.from('policies').select('*').order('created_at', { ascending:false });
+  if (!polErr && pols) {
+    policies = pols.map(policyFromDB);
+    saveLS(LS_KEY_POLICIES, policies);
+  }
+  const { data: exps, error: expErr } = await sb.from('expenses').select('*').order('date', { ascending:false });
+  if (!expErr && exps) {
+    expenses = exps.map(expenseFromDB);
+    saveLS(LS_KEY_EXPENSES, expenses);
+  }
   render();
+
+  // Mantém os dados sincronizados em tempo real entre abas/dispositivos
+  sb.channel('policies-changes')
+    .on('postgres_changes', { event:'*', schema:'public', table:'policies' }, () => loadFromSupabase())
+    .subscribe();
+  sb.channel('expenses-changes')
+    .on('postgres_changes', { event:'*', schema:'public', table:'expenses' }, () => loadFromSupabase())
+    .subscribe();
+}
+
+window.addEventListener('sb-ready', () => {
+  if (window._sbOffline) { render(); return; }
+  loadFromSupabase();
+});
+
+window.addEventListener('load', () => {
+  // Se o módulo Supabase já tiver disparado o evento antes deste listener
+  // ser registrado (carregamento rápido), garante que ainda renderizamos.
+  if (window._sbOffline || window._sbUser) { 
+    if (window._sbOffline) render(); else loadFromSupabase();
+  } else if (!window._sb) {
+    render();
+  }
 });
 
 /* ═══════════════════════════════════════════════════════════════
@@ -1075,16 +1102,18 @@ async function handleSubmit(e) {
     paymentMethod: get('paymentMethod'), commissionStatus: get('commissionStatus'),
   };
 
-  // Try Firebase first, fall back to localStorage
-  if (window._fb && window._fbUser && !window._fbOffline) {
+  // Tenta Supabase primeiro, com fallback para localStorage
+  if (window._sb && window._sbUser && !window._sbOffline) {
     try {
-      const { db, collection, doc, addDoc, updateDoc, APP_ID } = window._fb;
-      const uid2 = window._fbUser.uid;
-      const colRef = collection(db,'artifacts',APP_ID,'users',uid2,'policies');
+      const sb = window._sb.client;
       if (editingId) {
-        await updateDoc(doc(db,'artifacts',APP_ID,'users',uid2,'policies',editingId), p);
+        const { error } = await sb.from('policies').update(policyToDB(p)).eq('id', editingId);
+        if (error) throw error;
       } else {
-        await addDoc(colRef, {...p, createdAt:Date.now()});
+        const { error } = await sb.from('policies').insert({
+          ...policyToDB(p), user_id: window._sbUser.id, created_at: Date.now()
+        });
+        if (error) throw error;
       }
       showNotif(editingId ? 'Seguro atualizado!' : 'Seguro cadastrado!');
       editingId=null; clearForm(); setEditMode(false); navigate('list'); return;
@@ -1115,10 +1144,10 @@ function editPolicy(id) {
 
 function deletePolicy(id) {
   openModal('Este registro será excluído permanentemente. Essa ação não pode ser desfeita.', async () => {
-    if (window._fb && window._fbUser && !window._fbOffline) {
+    if (window._sb && window._sbUser && !window._sbOffline) {
       try {
-        const { db, doc, deleteDoc, APP_ID } = window._fb;
-        await deleteDoc(doc(db,'artifacts',APP_ID,'users',window._fbUser.uid,'policies',id));
+        const { error } = await window._sb.client.from('policies').delete().eq('id', id);
+        if (error) throw error;
         showNotif('Registro excluído.'); return;
       } catch(err){ console.warn(err); }
     }
@@ -1130,10 +1159,10 @@ function deletePolicy(id) {
 }
 
 async function markAsPaid(id) {
-  if (window._fb && window._fbUser && !window._fbOffline) {
+  if (window._sb && window._sbUser && !window._sbOffline) {
     try {
-      const { db, doc, updateDoc, APP_ID } = window._fb;
-      await updateDoc(doc(db,'artifacts',APP_ID,'users',window._fbUser.uid,'policies',id), {commissionStatus:'Recebida'});
+      const { error } = await window._sb.client.from('policies').update({commission_status:'Recebida'}).eq('id', id);
+      if (error) throw error;
       showNotif('Comissão marcada como recebida!'); return;
     } catch(err){ console.warn(err); }
   }
@@ -1153,10 +1182,12 @@ async function addExpense(e) {
   const amount = parseFloat(document.getElementById('exp-amount').value)||0;
   const date   = new Date().toISOString().split('T')[0];
 
-  if (window._fb && window._fbUser && !window._fbOffline) {
+  if (window._sb && window._sbUser && !window._sbOffline) {
     try {
-      const { db, collection, addDoc, APP_ID } = window._fb;
-      await addDoc(collection(db,'artifacts',APP_ID,'users',window._fbUser.uid,'expenses'), {description:desc,amount,date,createdAt:Date.now()});
+      const { error } = await window._sb.client.from('expenses').insert({
+        description:desc, amount, date, created_at:Date.now(), user_id: window._sbUser.id
+      });
+      if (error) throw error;
       document.getElementById('exp-desc').value='';
       document.getElementById('exp-amount').value='';
       showNotif('Despesa registrada!'); return;
@@ -1173,10 +1204,10 @@ async function addExpense(e) {
 
 function deleteExpense(id) {
   openModal('Excluir esta despesa permanentemente?', async () => {
-    if (window._fb && window._fbUser && !window._fbOffline) {
+    if (window._sb && window._sbUser && !window._sbOffline) {
       try {
-        const { db, doc, deleteDoc, APP_ID } = window._fb;
-        await deleteDoc(doc(db,'artifacts',APP_ID,'users',window._fbUser.uid,'expenses',id));
+        const { error } = await window._sb.client.from('expenses').delete().eq('id', id);
+        if (error) throw error;
         showNotif('Despesa excluída.'); return;
       } catch(err){ console.warn(err); }
     }
