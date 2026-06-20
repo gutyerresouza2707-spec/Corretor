@@ -1632,12 +1632,27 @@ function resetDashboardMonth() {
 function renderDashboard() {
   populateDashboardMonthSelect();
   const today = new Date(); today.setHours(0,0,0,0);
-  const activePolicies = policies.filter(p=>getStatus(p.validityEnd).label==='Ativo');
-  const paidEarnings   = policies.filter(p=>p.commissionStatus==='Recebida').reduce((a,c)=>a+(c.brokerEarning||0),0);
-  const pendingEarnings= policies.filter(p=>p.commissionStatus==='Pendente').reduce((a,c)=>a+(c.brokerEarning||0),0);
-  const totalExp       = expenses.reduce((a,c)=>a+c.amount,0);
+
+  // Filtra pelo mês/ano selecionado no topo (dashboardMonth/dashboardYear)
+  const policiesInSelectedMonth = policies.filter(p=>{
+    const d = parseValidityStart(p);
+    return d && d.getFullYear()===dashboardYear && d.getMonth()===dashboardMonth;
+  });
+  const expensesInSelectedMonth = expenses.filter(e=>{
+    if (!e.date) return false;
+    const [y,m] = e.date.split('-').map(Number);
+    return y===dashboardYear && (m-1)===dashboardMonth;
+  });
+
+  const activePolicies = policiesInSelectedMonth.filter(p=>getStatus(p.validityEnd).label==='Ativo');
+  const paidEarnings   = policiesInSelectedMonth.filter(p=>p.commissionStatus==='Recebida').reduce((a,c)=>a+(c.brokerEarning||0),0);
+  const pendingEarnings= policiesInSelectedMonth.filter(p=>p.commissionStatus==='Pendente').reduce((a,c)=>a+(c.brokerEarning||0),0);
+  const totalExp       = expensesInSelectedMonth.reduce((a,c)=>a+c.amount,0);
   const netProfit      = paidEarnings - totalExp;
   const renewals       = policies.filter(p=>getStatus(p.validityEnd).label==='A Vencer').sort((a,b)=>getStatus(a.validityEnd).daysLeft-getStatus(b.validityEnd).daysLeft);
+
+  // Mês/ano selecionados (usado nos KPIs e em todo o restante do dashboard)
+  const cm=dashboardMonth, cy=dashboardYear;
 
   // KPIs
   document.getElementById('dash-kpis').innerHTML = `
@@ -1646,9 +1661,9 @@ function renderDashboard() {
         <div class="stat-icon" style="background:rgba(108,99,255,.15);color:var(--accent2)">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
         </div>
-        <span style="font-size:11px;color:var(--muted);font-weight:600">total</span>
+        <span style="font-size:11px;color:var(--muted);font-weight:600">${MESES_PT[cm]}/${cy}</span>
       </div>
-      <div><div class="stat-label">Apólices Ativas</div><div class="stat-value">${activePolicies.length}</div></div>
+      <div><div class="stat-label">Apólices do Mês</div><div class="stat-value">${activePolicies.length}</div></div>
     </div>
     <div class="stat-card accent">
       <div style="display:flex;justify-content:space-between;align-items:center">
@@ -1657,7 +1672,7 @@ function renderDashboard() {
         </div>
         <span style="font-size:10px;color:${netProfit>=0?'var(--green)':'var(--red)'};font-weight:700;text-transform:uppercase">${netProfit>=0?'positivo':'negativo'}</span>
       </div>
-      <div><div class="stat-label" style="color:rgba(167,139,250,.7)">Lucro Líquido</div>
+      <div><div class="stat-label" style="color:rgba(167,139,250,.7)">Lucro do Mês</div>
       <div class="stat-value" style="color:${netProfit>=0?'var(--green)':'var(--red)'};font-size:22px">${fmt(netProfit)}</div></div>
     </div>
     <div class="stat-card">
@@ -1675,7 +1690,6 @@ function renderDashboard() {
   `;
 
   /* ═══ Cálculos de período (usa o mês/ano selecionado no filtro) ═══ */
-  const cm=dashboardMonth, cy=dashboardYear;
   const pm = cm===0?11:cm-1, pmYear = cm===0?cy-1:cy;
   const py = cy-1;
   const isCurrentMonth = (cm===today.getMonth() && cy===today.getFullYear());
