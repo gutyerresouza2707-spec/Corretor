@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>CorretorPro — Gestor de Negócios</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
 
 <!-- Supabase -->
 <script type="module">
@@ -67,7 +67,7 @@
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Inter', sans-serif;
   min-height: 100vh;
 }
 
@@ -120,7 +120,7 @@ body {
   width:100%; display:flex; align-items:center; gap:9px;
   padding:10px 12px; border-radius:10px;
   background:none; border:none; color:var(--muted2);
-  font-family:'DM Sans',sans-serif; font-size:13.5px; font-weight:500;
+  font-family:'Inter',sans-serif; font-size:13.5px; font-weight:500;
   cursor:pointer; transition:all .16s; text-align:left; position:relative;
 }
 .nav-btn:hover { background:var(--surface2); color:var(--text); }
@@ -165,7 +165,8 @@ body {
 
 /* ═══ PAGE HEADER ═══ */
 .page-header { display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:26px; }
-.page-title { font-family:'Syne',sans-serif; font-size:26px; font-weight:800; line-height:1; letter-spacing:-.025em; }
+.page-title { font-family:'Montserrat',sans-serif; font-size:26px; font-weight:800; line-height:1; letter-spacing:-.025em; }
+.syne { font-family:'Montserrat',sans-serif; }
 .page-sub { font-size:13px; color:var(--muted); margin-top:5px; }
 .page-header-actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
 
@@ -187,7 +188,7 @@ body {
 .stat-icon { width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; }
 .stat-icon svg { width:17px; height:17px; }
 .stat-label { font-size:11px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.06em; margin-bottom:2px; }
-.stat-value { font-family:'Syne',sans-serif; font-size:24px; font-weight:700; line-height:1; letter-spacing:-.02em; }
+.stat-value { font-family:'Montserrat',sans-serif; font-size:24px; font-weight:700; line-height:1; letter-spacing:-.02em; }
 
 /* ═══ GRIDS ═══ */
 .grid-4 { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; }
@@ -214,7 +215,7 @@ body {
 }
 .perf-metric:hover { border-color:rgba(108,99,255,.25); }
 .perf-label { font-size:10px; color:rgba(167,139,250,.55); margin-bottom:7px; text-transform:uppercase; letter-spacing:.07em; font-weight:700; }
-.perf-val { font-family:'Syne',sans-serif; font-size:34px; font-weight:800; line-height:1; }
+.perf-val { font-family:'Montserrat',sans-serif; font-size:34px; font-weight:800; line-height:1; }
 
 /* ═══ PROGRESS BAR ═══ */
 .progress-bar { height:4px; border-radius:99px; background:var(--border2); overflow:hidden; margin-top:8px; }
@@ -261,7 +262,7 @@ tbody td { padding:13px 18px; font-size:13px; vertical-align:middle; }
 
 /* ═══ PLATE CHIP ═══ */
 .plate-chip {
-  display:inline-block; font-family:'Syne',monospace; font-size:10.5px; font-weight:700;
+  display:inline-block; font-family:'Montserrat',monospace; font-size:10.5px; font-weight:700;
   letter-spacing:.1em; background:var(--surface2); border:1px solid var(--border2);
   border-radius:5px; padding:2px 6px; color:var(--muted2); text-transform:uppercase;
 }
@@ -271,7 +272,7 @@ tbody td { padding:13px 18px; font-size:13px; vertical-align:middle; }
   display:inline-flex; align-items:center; gap:7px;
   background:linear-gradient(135deg,var(--accent),#7c3aed);
   color:#fff; border:none; border-radius:10px; padding:10px 20px;
-  font-family:'DM Sans',sans-serif; font-size:13.5px; font-weight:600;
+  font-family:'Inter',sans-serif; font-size:13.5px; font-weight:600;
   cursor:pointer; transition:opacity .16s, transform .16s, box-shadow .16s;
   box-shadow:0 4px 18px rgba(108,99,255,.38); white-space:nowrap;
 }
@@ -282,7 +283,7 @@ tbody td { padding:13px 18px; font-size:13px; vertical-align:middle; }
   display:inline-flex; align-items:center; gap:7px;
   background:transparent; color:var(--muted2);
   border:1px solid var(--border2); border-radius:10px; padding:10px 16px;
-  font-family:'DM Sans',sans-serif; font-size:13.5px; font-weight:500;
+  font-family:'Inter',sans-serif; font-size:13.5px; font-weight:500;
   cursor:pointer; transition:all .16s; white-space:nowrap;
 }
 .btn-ghost:hover { background:var(--surface2); color:var(--text); border-color:var(--muted); }
@@ -292,7 +293,7 @@ tbody td { padding:13px 18px; font-size:13px; vertical-align:middle; }
   display:inline-flex; align-items:center; gap:7px;
   background:rgba(244,63,94,.12); color:var(--red);
   border:1px solid rgba(244,63,94,.25); border-radius:10px; padding:10px 16px;
-  font-family:'DM Sans',sans-serif; font-size:13.5px; font-weight:600;
+  font-family:'Inter',sans-serif; font-size:13.5px; font-weight:600;
   cursor:pointer; transition:all .16s;
 }
 .btn-danger:hover { background:var(--red); color:#fff; border-color:var(--red); }
@@ -315,7 +316,7 @@ tbody td { padding:13px 18px; font-size:13px; vertical-align:middle; }
 .search-wrap input {
   width:100%; background:var(--surface2); border:1px solid var(--border2);
   border-radius:10px; padding:8px 32px; color:var(--text);
-  font-family:'DM Sans',sans-serif; font-size:13px; outline:none;
+  font-family:'Inter',sans-serif; font-size:13px; outline:none;
   transition:border-color .16s, box-shadow .16s;
 }
 .search-wrap input:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(108,99,255,.12); }
@@ -332,7 +333,7 @@ tbody td { padding:13px 18px; font-size:13px; vertical-align:middle; }
 .form-section { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:22px; }
 .form-section.financial { border-color:rgba(108,99,255,.18); background:rgba(108,99,255,.025); }
 .form-section-title {
-  font-family:'Syne',sans-serif; font-size:10.5px; font-weight:700;
+  font-family:'Montserrat',sans-serif; font-size:10.5px; font-weight:700;
   text-transform:uppercase; letter-spacing:.1em; color:var(--muted);
   margin-bottom:18px; display:flex; align-items:center; gap:8px;
 }
@@ -348,7 +349,7 @@ tbody td { padding:13px 18px; font-size:13px; vertical-align:middle; }
 .field input, .field select {
   width:100%; background:var(--surface2); border:1px solid var(--border2);
   border-radius:10px; padding:10px 14px; color:var(--text);
-  font-family:'DM Sans',sans-serif; font-size:14px; outline:none;
+  font-family:'Inter',sans-serif; font-size:14px; outline:none;
   transition:border-color .16s, box-shadow .16s, background .16s;
   -webkit-appearance:none; appearance:none;
 }
@@ -394,7 +395,7 @@ tbody td { padding:13px 18px; font-size:13px; vertical-align:middle; }
   background:rgba(249,115,22,.14); color:var(--orange);
   border:1px solid rgba(249,115,22,.25); border-radius:6px;
   padding:4px 9px; cursor:pointer; transition:all .14s;
-  font-family:'DM Sans',sans-serif; margin-top:5px;
+  font-family:'Inter',sans-serif; margin-top:5px;
 }
 .mark-paid-btn:hover { background:var(--orange); color:#fff; }
 
@@ -406,7 +407,7 @@ tbody td { padding:13px 18px; font-size:13px; vertical-align:middle; }
 .expense-form-row input {
   background:var(--surface2); border:1px solid var(--border2);
   border-radius:9px; padding:8px 12px; color:var(--text);
-  font-family:'DM Sans',sans-serif; font-size:13px; outline:none;
+  font-family:'Inter',sans-serif; font-size:13px; outline:none;
   transition:border-color .14s;
 }
 .expense-form-row input:focus { border-color:var(--red); }
@@ -565,15 +566,15 @@ tbody td { padding:13px 18px; font-size:13px; vertical-align:middle; }
     <form id="auth-form" onsubmit="handleAuth(event)">
       <div class="field" id="auth-name-group" style="display:none;margin-bottom:14px">
         <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted2);display:block;margin-bottom:6px">Seu nome</label>
-        <input id="auth-name" type="text" placeholder="Ex: João Corretor" style="width:100%;padding:11px 13px;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13.5px"/>
+        <input id="auth-name" type="text" placeholder="Ex: João Corretor" style="width:100%;padding:11px 13px;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;color:var(--text);font-family:'Inter',sans-serif;font-size:13.5px"/>
       </div>
       <div class="field" style="margin-bottom:14px">
         <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted2);display:block;margin-bottom:6px">E-mail</label>
-        <input id="auth-email" type="email" required placeholder="seu@email.com" style="width:100%;padding:11px 13px;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13.5px"/>
+        <input id="auth-email" type="email" required placeholder="seu@email.com" style="width:100%;padding:11px 13px;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;color:var(--text);font-family:'Inter',sans-serif;font-size:13.5px"/>
       </div>
       <div class="field" style="margin-bottom:14px">
         <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted2);display:block;margin-bottom:6px">Senha</label>
-        <input id="auth-password" type="password" required placeholder="Mínimo 6 caracteres" minlength="6" style="width:100%;padding:11px 13px;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13.5px"/>
+        <input id="auth-password" type="password" required placeholder="Mínimo 6 caracteres" minlength="6" style="width:100%;padding:11px 13px;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;color:var(--text);font-family:'Inter',sans-serif;font-size:13.5px"/>
       </div>
       <div id="auth-error" style="display:none;font-size:12.5px;color:var(--red);margin:10px 0;line-height:1.5"></div>
       <button type="submit" class="btn-primary" id="auth-submit-btn" style="width:100%;justify-content:center;margin-top:6px">
@@ -664,6 +665,19 @@ tbody td { padding:13px 18px; font-size:13px; vertical-align:middle; }
         </div>
       </div>
 
+      <!-- Filtro de mês/ano -->
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:22px">
+        <button onclick="changeDashboardMonth(-1)" title="Mês anterior" style="background:var(--surface);border:1px solid var(--border);color:var(--muted2);cursor:pointer;width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;transition:background .14s" onmouseenter="this.style.background='var(--surface2)'" onmouseleave="this.style.background='var(--surface)'">
+          <svg style="width:15px;height:15px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <select id="dash-month-select" onchange="onDashboardMonthSelect()" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:9px;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;min-width:120px"></select>
+        <select id="dash-year-select" onchange="onDashboardYearSelect()" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:9px;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;min-width:90px"></select>
+        <button onclick="changeDashboardMonth(1)" title="Próximo mês" style="background:var(--surface);border:1px solid var(--border);color:var(--muted2);cursor:pointer;width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;transition:background .14s" onmouseenter="this.style.background='var(--surface2)'" onmouseleave="this.style.background='var(--surface)'">
+          <svg style="width:15px;height:15px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+        <button onclick="resetDashboardMonth()" title="Voltar para o mês atual" style="background:none;border:none;color:var(--accent2);cursor:pointer;font-size:12px;font-weight:600;padding:8px 6px">Hoje</button>
+      </div>
+
       <!-- KPIs -->
       <div class="grid-4" style="margin-bottom:22px" id="dash-kpis"></div>
 
@@ -706,7 +720,7 @@ tbody td { padding:13px 18px; font-size:13px; vertical-align:middle; }
         <div class="perf-card">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
             <svg style="width:15px;height:15px;color:var(--accent2)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-            <span class="syne" style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted2)">Seguradoras — Mês Atual vs Anterior</span>
+            <span class="syne" id="dash-insurer-month-title" style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted2)">Seguradoras — Mês Atual vs Anterior</span>
           </div>
           <div style="position:relative;width:100%;height:230px">
             <canvas id="chart-insurer-month"></canvas>
@@ -946,8 +960,8 @@ tbody td { padding:13px 18px; font-size:13px; vertical-align:middle; }
           <button onclick="changeCashflowMonth(-1)" title="Mês anterior" style="background:var(--surface);border:1px solid var(--border);color:var(--muted2);cursor:pointer;width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;transition:background .14s" onmouseenter="this.style.background='var(--surface2)'" onmouseleave="this.style.background='var(--surface)'">
             <svg style="width:15px;height:15px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
           </button>
-          <select id="cashflow-month-only-select" onchange="onCashflowMonthOnlySelect()" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:9px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;min-width:120px"></select>
-          <select id="cashflow-year-only-select" onchange="onCashflowYearOnlySelect()" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:9px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;min-width:90px"></select>
+          <select id="cashflow-month-only-select" onchange="onCashflowMonthOnlySelect()" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:9px;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;min-width:120px"></select>
+          <select id="cashflow-year-only-select" onchange="onCashflowYearOnlySelect()" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:9px;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;min-width:90px"></select>
           <button onclick="changeCashflowMonth(1)" title="Próximo mês" style="background:var(--surface);border:1px solid var(--border);color:var(--muted2);cursor:pointer;width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;transition:background .14s" onmouseenter="this.style.background='var(--surface2)'" onmouseleave="this.style.background='var(--surface)'">
             <svg style="width:15px;height:15px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
           </button>
@@ -1557,7 +1571,66 @@ function countWorkdays(start, end) {
   return wd;
 }
 
+/* ── Filtro de mês/ano do Dashboard ── */
+let dashboardMonth = new Date().getMonth();
+let dashboardYear  = new Date().getFullYear();
+
+function getDashboardYearRange() {
+  const allDates = [
+    ...policies.map(p=>p.validityStart).filter(Boolean),
+    ...expenses.map(e=>e.date).filter(Boolean)
+  ].map(d=>parseInt(d.split('-')[0]));
+  const today = new Date();
+  let minY = today.getFullYear(), maxY = today.getFullYear();
+  allDates.forEach(y=>{ if(y<minY) minY=y; if(y>maxY) maxY=y; });
+  return {minY, maxY};
+}
+
+function populateDashboardMonthSelect() {
+  const monthSel = document.getElementById('dash-month-select');
+  const yearSel  = document.getElementById('dash-year-select');
+  if (!monthSel || !yearSel) return;
+
+  if (!monthSel.dataset.filled) {
+    monthSel.innerHTML = MESES_PT.map((nome,i)=>`<option value="${i}">${nome}</option>`).join('');
+    monthSel.dataset.filled = '1';
+  }
+  monthSel.value = dashboardMonth;
+
+  const {minY, maxY} = getDashboardYearRange();
+  const yearsKey = `${minY}-${maxY}`;
+  if (yearSel.dataset.range !== yearsKey) {
+    const opts = [];
+    for (let y=maxY; y>=minY; y--) opts.push(`<option value="${y}">${y}</option>`);
+    yearSel.innerHTML = opts.join('');
+    yearSel.dataset.range = yearsKey;
+  }
+  yearSel.value = dashboardYear;
+}
+
+function onDashboardMonthSelect() {
+  dashboardMonth = parseInt(document.getElementById('dash-month-select').value);
+  renderDashboard();
+}
+function onDashboardYearSelect() {
+  dashboardYear = parseInt(document.getElementById('dash-year-select').value);
+  renderDashboard();
+}
+function changeDashboardMonth(delta) {
+  dashboardMonth += delta;
+  if (dashboardMonth > 11) { dashboardMonth = 0; dashboardYear++; }
+  if (dashboardMonth < 0)  { dashboardMonth = 11; dashboardYear--; }
+  renderDashboard();
+}
+function resetDashboardMonth() {
+  const today = new Date();
+  dashboardMonth = today.getMonth();
+  dashboardYear = today.getFullYear();
+  renderDashboard();
+}
+
 function renderDashboard() {
+  populateDashboardMonthSelect();
   const today = new Date(); today.setHours(0,0,0,0);
   const activePolicies = policies.filter(p=>getStatus(p.validityEnd).label==='Ativo');
   const paidEarnings   = policies.filter(p=>p.commissionStatus==='Recebida').reduce((a,c)=>a+(c.brokerEarning||0),0);
@@ -1601,10 +1674,11 @@ function renderDashboard() {
     </div>
   `;
 
-  /* ═══ Cálculos de período ═══ */
-  const cm=today.getMonth(), cy=today.getFullYear();
+  /* ═══ Cálculos de período (usa o mês/ano selecionado no filtro) ═══ */
+  const cm=dashboardMonth, cy=dashboardYear;
   const pm = cm===0?11:cm-1, pmYear = cm===0?cy-1:cy;
   const py = cy-1;
+  const isCurrentMonth = (cm===today.getMonth() && cy===today.getFullYear());
 
   const policiesWithDate = policies.map(p=>({...p, _d: parseValidityStart(p)})).filter(p=>p._d);
 
@@ -1614,7 +1688,9 @@ function renderDashboard() {
   const thisYearPolicies = policiesWithDate.filter(p=>p._d.getFullYear()===cy);
   const lastYearPolicies = policiesWithDate.filter(p=>p._d.getFullYear()===py);
 
-  const wd = countWorkdays(new Date(cy,cm,1), today);
+  // Dias úteis: se for o mês atual, conta até hoje; se for mês passado/futuro, conta o mês inteiro
+  const monthEnd = isCurrentMonth ? today : new Date(cy, cm+1, 0);
+  const wd = countWorkdays(new Date(cy,cm,1), monthEnd);
   const avg = (thisMonth.length/(wd||1)).toFixed(1);
   const monthEarnings = thisMonth.reduce((a,c)=>a+(c.brokerEarning||0),0);
 
@@ -1630,17 +1706,17 @@ function renderDashboard() {
 
   document.getElementById('dash-kpis-extra').innerHTML = `
     <div class="stat-card">
-      <div class="stat-label">Fechados este mês</div>
+      <div class="stat-label">Fechados em ${MESES_PT[cm]}</div>
       <div class="stat-value" style="font-size:22px">${thisMonth.length}</div>
       <div style="margin-top:6px">${changeBadge(momChange)}</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Média por dia útil</div>
       <div class="stat-value" style="font-size:22px">${avg}</div>
-      <div style="font-size:11px;color:var(--muted);margin-top:6px">${wd} dias úteis até hoje</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px">${wd} dias úteis ${isCurrentMonth?'até hoje':'no mês'}</div>
     </div>
     <div class="stat-card">
-      <div class="stat-label">Comissão do mês</div>
+      <div class="stat-label">Comissão de ${MESES_PT[cm]}</div>
       <div class="stat-value" style="font-size:20px;color:var(--green)">${fmt(monthEarnings)}</div>
       <div style="margin-top:6px">${changeBadge(momEarningsChange)}</div>
     </div>
@@ -1718,6 +1794,9 @@ function renderDashboard() {
   const allInsurersYear = [...new Set([...Object.keys(insThisYear), ...Object.keys(insLastYear)])]
     .sort((a,b)=>(insThisYear[b]||0)-(insThisYear[a]||0)).slice(0,8);
 
+  const insurerMonthTitle = document.getElementById('dash-insurer-month-title');
+  if (insurerMonthTitle) insurerMonthTitle.textContent = `Seguradoras — ${MESES_PT[cm]} vs ${MESES_PT[pm]}`;
+
   destroyChart('insurerMonth');
   const ctxIM = document.getElementById('chart-insurer-month');
   if (ctxIM) {
@@ -1765,7 +1844,7 @@ function renderDashboard() {
   document.getElementById('dash-perf').innerHTML = `
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:20px">
       <svg style="width:17px;height:17px;color:var(--accent2)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-      <span class="syne" style="font-size:12px;font-weight:700;color:var(--accent2);text-transform:uppercase;letter-spacing:.07em">Desempenho · Mês Atual</span>
+      <span class="syne" style="font-size:12px;font-weight:700;color:var(--accent2);text-transform:uppercase;letter-spacing:.07em">Desempenho · ${MESES_PT[cm]} de ${cy}</span>
     </div>
     <div class="grid-3">
       <div class="perf-metric">
