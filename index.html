@@ -790,7 +790,7 @@ tbody td { padding:13px 18px; font-size:13px; vertical-align:middle; }
               <div class="field field-icon">
                 <label>Seguradora</label>
                 <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                <input required type="text" name="insurer" id="f-insurer" placeholder="Ex: Porto, SulAmérica..."/>
+                <input required type="text" name="insurer" id="f-insurer" placeholder="Ex: Porto, SulAmérica..." oninput="applyFixedCommission()"/>
               </div>
               <div class="field field-icon">
                 <label>Indicador / Parceiro <span style="font-weight:400;text-transform:none;color:var(--muted);font-size:10px">(opcional)</span></label>
@@ -1273,6 +1273,27 @@ function autoEndDate() {
   if (!start) return;
   const d = new Date(start); d.setFullYear(d.getFullYear()+1);
   document.getElementById('f-validityEnd').value = d.toISOString().split('T')[0];
+}
+
+/* ── Comissão fixa por seguradora (preenche "Seu Ganho" automaticamente) ── */
+const FIXED_COMMISSION_BY_INSURER = [
+  { match: ['ative'],                         value: 50.00 },
+  { match: ['suhai'],                         value: 10.00 },
+  { match: ['tokio'],                         value: 35.00 },
+  { match: ['allianz'],                       value: 35.00 },
+  { match: ['porto'],                         value: 35.00 },
+];
+
+function applyFixedCommission() {
+  const insurerEl = document.getElementById('f-insurer');
+  const earningEl = document.getElementById('f-brokerEarning');
+  if (!insurerEl || !earningEl) return;
+  const raw = insurerEl.value.trim().toLowerCase();
+  if (!raw) return;
+  const found = FIXED_COMMISSION_BY_INSURER.find(rule => rule.match.some(kw => raw.includes(kw)));
+  if (found) {
+    earningEl.value = found.value.toFixed(2);
+  }
 }
 
 function calcCommission() {
