@@ -942,6 +942,17 @@ tbody td { padding:13px 18px; font-size:13px; vertical-align:middle; }
           <h2 class="page-title syne">Financeiro</h2>
           <p class="page-sub">Controle de entradas e saídas</p>
         </div>
+        <div class="page-header-actions" style="display:flex;align-items:center;gap:8px">
+          <button onclick="changeCashflowMonth(-1)" title="Mês anterior" style="background:var(--surface);border:1px solid var(--border);color:var(--muted2);cursor:pointer;width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;transition:background .14s" onmouseenter="this.style.background='var(--surface2)'" onmouseleave="this.style.background='var(--surface)'">
+            <svg style="width:15px;height:15px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <select id="cashflow-month-only-select" onchange="onCashflowMonthOnlySelect()" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:9px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;min-width:120px"></select>
+          <select id="cashflow-year-only-select" onchange="onCashflowYearOnlySelect()" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:9px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;min-width:90px"></select>
+          <button onclick="changeCashflowMonth(1)" title="Próximo mês" style="background:var(--surface);border:1px solid var(--border);color:var(--muted2);cursor:pointer;width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;transition:background .14s" onmouseenter="this.style.background='var(--surface2)'" onmouseleave="this.style.background='var(--surface)'">
+            <svg style="width:15px;height:15px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+          <button onclick="resetCashflowMonth()" title="Voltar para o mês atual" style="background:none;border:none;color:var(--accent2);cursor:pointer;font-size:12px;font-weight:600;padding:8px 6px">Hoje</button>
+        </div>
       </div>
       <!-- KPIs financeiros -->
       <div class="grid-4" style="margin-bottom:20px" id="cash-kpis"></div>
@@ -1859,10 +1870,86 @@ function renderList() {
 }
 
 /* ── CASHFLOW ── */
+/* ── CASHFLOW ── */
+let cashflowMonth = new Date().getMonth();
+let cashflowYear  = new Date().getFullYear();
+
+function getCashflowYearRange() {
+  const allDates = [
+    ...policies.map(p=>p.validityStart).filter(Boolean),
+    ...expenses.map(e=>e.date).filter(Boolean)
+  ].map(d=>parseInt(d.split('-')[0]));
+  const today = new Date();
+  let minY = today.getFullYear(), maxY = today.getFullYear();
+  allDates.forEach(y=>{ if(y<minY) minY=y; if(y>maxY) maxY=y; });
+  return {minY, maxY};
+}
+
+function populateCashflowMonthSelect() {
+  const monthSel = document.getElementById('cashflow-month-only-select');
+  const yearSel  = document.getElementById('cashflow-year-only-select');
+  if (!monthSel || !yearSel) return;
+
+  // Popula meses (sempre os 12, sem filtrar — mês é independente do ano escolhido)
+  if (!monthSel.dataset.filled) {
+    monthSel.innerHTML = MESES_PT.map((nome,i)=>`<option value="${i}">${nome}</option>`).join('');
+    monthSel.dataset.filled = '1';
+  }
+  monthSel.value = cashflowMonth;
+
+  // Popula anos com base no intervalo real de dados
+  const {minY, maxY} = getCashflowYearRange();
+  const yearsKey = `${minY}-${maxY}`;
+  if (yearSel.dataset.range !== yearsKey) {
+    const opts = [];
+    for (let y=maxY; y>=minY; y--) opts.push(`<option value="${y}">${y}</option>`);
+    yearSel.innerHTML = opts.join('');
+    yearSel.dataset.range = yearsKey;
+  }
+  yearSel.value = cashflowYear;
+}
+
+function onCashflowMonthOnlySelect() {
+  const sel = document.getElementById('cashflow-month-only-select');
+  cashflowMonth = parseInt(sel.value);
+  renderCashflow();
+}
+
+function onCashflowYearOnlySelect() {
+  const sel = document.getElementById('cashflow-year-only-select');
+  cashflowYear = parseInt(sel.value);
+  renderCashflow();
+}
+
+function changeCashflowMonth(delta) {
+  cashflowMonth += delta;
+  if (cashflowMonth > 11) { cashflowMonth = 0; cashflowYear++; }
+  if (cashflowMonth < 0)  { cashflowMonth = 11; cashflowYear--; }
+  renderCashflow();
+}
+
+function resetCashflowMonth() {
+  const today = new Date();
+  cashflowMonth = today.getMonth();
+  cashflowYear = today.getFullYear();
+  renderCashflow();
+}
+
+function isInCashflowMonth(dateStr) {
+  if (!dateStr) return false;
+  const [y,m] = dateStr.split('-').map(Number);
+  return y===cashflowYear && (m-1)===cashflowMonth;
+}
+
 function renderCashflow() {
-  const paidEarnings   = policies.filter(p=>p.commissionStatus==='Recebida').reduce((a,c)=>a+(c.brokerEarning||0),0);
-  const pendingEarnings= policies.filter(p=>p.commissionStatus==='Pendente').reduce((a,c)=>a+(c.brokerEarning||0),0);
-  const totalExp       = expenses.reduce((a,c)=>a+c.amount,0);
+  populateCashflowMonthSelect();
+
+  const policiesInMonth = policies.filter(p=>isInCashflowMonth(p.validityStart));
+  const expensesInMonth = expenses.filter(e=>isInCashflowMonth(e.date));
+
+  const paidEarnings   = policiesInMonth.filter(p=>p.commissionStatus==='Recebida').reduce((a,c)=>a+(c.brokerEarning||0),0);
+  const pendingEarnings= policiesInMonth.filter(p=>p.commissionStatus==='Pendente').reduce((a,c)=>a+(c.brokerEarning||0),0);
+  const totalExp       = expensesInMonth.reduce((a,c)=>a+c.amount,0);
   const netProfit      = paidEarnings - totalExp;
 
   // KPIs
@@ -1877,8 +1964,8 @@ function renderCashflow() {
       <div class="stat-value" style="color:${c.color};font-size:18px">${c.value}</div>
     </div>`).join('');
 
-  // Pending commissions
-  const pending = policies.filter(p=>p.commissionStatus==='Pendente');
+  // Pending commissions (do mês selecionado)
+  const pending = policiesInMonth.filter(p=>p.commissionStatus==='Pendente');
   document.getElementById('pending-badge').textContent = pending.length;
   document.getElementById('pending-list').innerHTML = pending.length
     ? pending.map(p=>`
@@ -1897,10 +1984,10 @@ function renderCashflow() {
         <span>Tudo recebido!</span>
       </div>`;
 
-  // Expenses
-  document.getElementById('expense-badge').textContent = expenses.length;
-  document.getElementById('expense-list').innerHTML = expenses.length
-    ? expenses.map(exp=>`
+  // Expenses (do mês selecionado)
+  document.getElementById('expense-badge').textContent = expensesInMonth.length;
+  document.getElementById('expense-list').innerHTML = expensesInMonth.length
+    ? expensesInMonth.map(exp=>`
       <div class="pending-item">
         <div>
           <div style="font-size:13px;font-weight:600">${exp.description}</div>
