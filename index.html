@@ -970,6 +970,40 @@ tbody td { padding:13px 18px; font-size:13px; vertical-align:middle; }
       </div>
       <!-- KPIs financeiros -->
       <div class="grid-4" style="margin-bottom:20px" id="cash-kpis"></div>
+
+      <!-- Evolução 12 meses -->
+      <div class="table-wrap" style="padding:18px 20px;margin-bottom:20px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+          <svg style="width:14px;height:14px;color:var(--accent2)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          <span class="syne" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted2)">Evolução · Receita vs Despesa (12 meses)</span>
+        </div>
+        <div style="position:relative;width:100%;height:220px">
+          <canvas id="chart-evolucao"></canvas>
+        </div>
+      </div>
+
+      <div class="grid-2-1" style="margin-bottom:20px">
+        <!-- Despesas por categoria -->
+        <div class="table-wrap" style="padding:18px 20px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+            <svg style="width:14px;height:14px;color:var(--accent2)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 010 20z"/></svg>
+            <span class="syne" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted2)">Despesas por Categoria</span>
+          </div>
+          <div style="position:relative;width:100%;height:200px">
+            <canvas id="chart-categorias"></canvas>
+          </div>
+          <div id="categorias-legend" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:12px"></div>
+        </div>
+        <!-- Comissões a receber por prazo -->
+        <div class="table-wrap" style="padding:18px 20px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+            <svg style="width:14px;height:14px;color:var(--orange)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <span class="syne" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted2)">A Receber por Prazo</span>
+          </div>
+          <div id="receber-prazo" style="display:flex;flex-direction:column;gap:10px"></div>
+        </div>
+      </div>
+
       <div class="grid-1-1">
         <!-- Pendentes -->
         <div class="table-wrap" style="display:flex;flex-direction:column;max-height:460px">
@@ -989,6 +1023,13 @@ tbody td { padding:13px 18px; font-size:13px; vertical-align:middle; }
           </div>
           <form class="expense-form-row" onsubmit="addExpense(event)">
             <input required type="text" id="exp-desc" placeholder="Descrição (ex: panfletos)..." style="flex:1"/>
+            <select id="exp-category" style="width:128px;background:var(--surface2);border:1px solid var(--border2);border-radius:9px;color:var(--text);font-family:'Inter',sans-serif;font-size:13px;padding:0 8px">
+              <option value="Divulgação">Divulgação</option>
+              <option value="Instagram">Instagram</option>
+              <option value="Campanhas">Campanhas</option>
+              <option value="Impresso">Impresso</option>
+              <option value="Outros">Outros</option>
+            </select>
             <input required type="number" step="0.01" id="exp-amount" placeholder="R$" style="width:84px"/>
             <button type="submit" class="add-exp-btn">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
@@ -1049,7 +1090,7 @@ function policyToDB(p) {
   };
 }
 function expenseFromDB(e) {
-  return { id: e.id, description: e.description, amount: e.amount, date: e.date, createdAt: e.created_at };
+  return { id: e.id, description: e.description, category: e.category, amount: e.amount, date: e.date, createdAt: e.created_at };
 }
 
 let _realtimeSubscribed = false;
@@ -1470,14 +1511,15 @@ async function markAsPaid(id) {
 ═══════════════════════════════════════════════════════════════ */
 async function addExpense(e) {
   e.preventDefault();
-  const desc   = document.getElementById('exp-desc').value.trim();
-  const amount = parseFloat(document.getElementById('exp-amount').value)||0;
-  const date   = new Date().toISOString().split('T')[0];
+  const desc     = document.getElementById('exp-desc').value.trim();
+  const category = document.getElementById('exp-category').value;
+  const amount   = parseFloat(document.getElementById('exp-amount').value)||0;
+  const date     = new Date().toISOString().split('T')[0];
 
   if (window._sb && window._sbUser && !window._sbOffline) {
     try {
       const { error } = await window._sb.client.from('expenses').insert({
-        description:desc, amount, date, created_at:Date.now(), user_id: window._sbUser.id
+        description:desc, category, amount, date, created_at:Date.now(), user_id: window._sbUser.id
       });
       if (error) throw error;
       document.getElementById('exp-desc').value='';
@@ -1486,7 +1528,7 @@ async function addExpense(e) {
     } catch(err){ console.warn(err); }
   }
 
-  expenses.unshift({id:uid(), description:desc, amount, date, createdAt:Date.now()});
+  expenses.unshift({id:uid(), description:desc, category, amount, date, createdAt:Date.now()});
   saveLS(LS_KEY_EXPENSES, expenses);
   document.getElementById('exp-desc').value='';
   document.getElementById('exp-amount').value='';
@@ -2118,6 +2160,108 @@ function renderCashflow() {
         <span>Tudo recebido!</span>
       </div>`;
 
+  /* ═══ Evolução 12 meses (receita vs despesa) ═══ */
+  const evoLabels = [], evoReceita = [], evoDespesa = [];
+  for (let i=11; i>=0; i--) {
+    let m = cashflowMonth - i, y = cashflowYear;
+    while (m < 0) { m += 12; y--; }
+    evoLabels.push(`${MESES_PT[m]}/${String(y).slice(2)}`);
+    const polsDoMes = policies.filter(p=>{
+      if (!p.validityStart) return false;
+      const [py,pm] = p.validityStart.split('-').map(Number);
+      return py===y && (pm-1)===m;
+    });
+    const expsDoMes = expenses.filter(e=>{
+      if (!e.date) return false;
+      const [ey,em] = e.date.split('-').map(Number);
+      return ey===y && (em-1)===m;
+    });
+    evoReceita.push(polsDoMes.filter(p=>isPaid(p.commissionStatus)).reduce((a,c)=>a+(c.brokerEarning||0),0));
+    evoDespesa.push(expsDoMes.reduce((a,c)=>a+c.amount,0));
+  }
+  destroyChart('evolucao');
+  const ctxEvo = document.getElementById('chart-evolucao');
+  if (ctxEvo) {
+    _charts.evolucao = new Chart(ctxEvo, {
+      type:'line',
+      data:{ labels: evoLabels,
+        datasets:[
+          { label:'Receita', data:evoReceita, borderColor:'#22d3a5', backgroundColor:'rgba(34,211,165,.1)', fill:true, tension:.3 },
+          { label:'Despesa', data:evoDespesa, borderColor:'#f43f5e', backgroundColor:'rgba(244,63,94,.1)', fill:true, tension:.3 }
+        ]},
+      options:{ responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{ display:true, position:'top', labels:{ color:'#9999aa', boxWidth:11, font:{size:11} } } },
+        scales:{ y:{ beginAtZero:true, ticks:{ color:'#9999aa' }, grid:{color:'rgba(255,255,255,.06)'} },
+                 x:{ ticks:{ color:'#9999aa', font:{size:10.5} }, grid:{display:false} } } }
+    });
+  }
+
+  /* ═══ Despesas por categoria (mês selecionado) ═══ */
+  const catColors = { 'Divulgação':'#6c63ff', 'Instagram':'#f43f5e', 'Campanhas':'#f97316', 'Impresso':'#22d3a5', 'Outros':'#888780' };
+  const byCategory = {};
+  expensesInMonth.forEach(e=>{ const c=e.category||'Outros'; byCategory[c]=(byCategory[c]||0)+e.amount; });
+  const catLabels = Object.keys(byCategory);
+  const catValues = Object.values(byCategory);
+  destroyChart('categorias');
+  const ctxCat = document.getElementById('chart-categorias');
+  const legendEl = document.getElementById('categorias-legend');
+  if (ctxCat) {
+    if (catLabels.length) {
+      _charts.categorias = new Chart(ctxCat, {
+        type:'doughnut',
+        data:{ labels: catLabels, datasets:[{ data: catValues, backgroundColor: catLabels.map(c=>catColors[c]||'#888780') }] },
+        options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } } }
+      });
+      if (legendEl) {
+        const total = catValues.reduce((a,b)=>a+b,0);
+        legendEl.innerHTML = catLabels.map((c,i)=>{
+          const pct = total>0 ? Math.round(catValues[i]/total*100) : 0;
+          return `<span style="display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--muted2)">
+            <span style="width:9px;height:9px;border-radius:3px;background:${catColors[c]||'#888780'}"></span>
+            ${c} <span style="color:var(--muted)">${pct}%</span>
+          </span>`;
+        }).join('');
+      }
+    } else if (legendEl) {
+      legendEl.innerHTML = '';
+    }
+  }
+
+  /* ═══ A Receber por prazo (próximos 30 dias / vencidas) ═══ */
+  const todayCF = new Date(); todayCF.setHours(0,0,0,0);
+  const allPendingGlobal = policies.filter(p=>p.commissionStatus==='Pendente');
+  const next30 = allPendingGlobal.filter(p=>{
+    const end = p.validityEnd ? new Date(p.validityEnd.split('-')[0], p.validityEnd.split('-')[1]-1, p.validityEnd.split('-')[2]) : null;
+    if (!end) return false;
+    const diff = (end - todayCF) / 86400000;
+    return diff >= 0 && diff <= 30;
+  });
+  const overdue = allPendingGlobal.filter(p=>{
+    const end = p.validityEnd ? new Date(p.validityEnd.split('-')[0], p.validityEnd.split('-')[1]-1, p.validityEnd.split('-')[2]) : null;
+    if (!end) return false;
+    return end < todayCF;
+  });
+  const sumEarning = arr => arr.reduce((a,c)=>a+(c.brokerEarning||0),0);
+  const receberPrazoEl = document.getElementById('receber-prazo');
+  if (receberPrazoEl) {
+    receberPrazoEl.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;background:rgba(249,115,22,.07);border:1px solid rgba(249,115,22,.15);border-radius:10px;padding:12px 14px">
+        <div>
+          <div style="font-size:12px;font-weight:600;color:var(--orange)">Próximos 30 dias</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">${next30.length} comiss${next30.length===1?'ão':'ões'}</div>
+        </div>
+        <div style="font-size:17px;font-weight:700;color:var(--orange)">${fmt(sumEarning(next30))}</div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;background:rgba(244,63,94,.07);border:1px solid rgba(244,63,94,.15);border-radius:10px;padding:12px 14px">
+        <div>
+          <div style="font-size:12px;font-weight:600;color:var(--red)">Vencidas</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">${overdue.length} comiss${overdue.length===1?'ão':'ões'}</div>
+        </div>
+        <div style="font-size:17px;font-weight:700;color:var(--red)">${fmt(sumEarning(overdue))}</div>
+      </div>
+    `;
+  }
+
   // Expenses (do mês selecionado)
   document.getElementById('expense-badge').textContent = expensesInMonth.length;
   document.getElementById('expense-list').innerHTML = expensesInMonth.length
@@ -2125,7 +2269,10 @@ function renderCashflow() {
       <div class="pending-item">
         <div>
           <div style="font-size:13px;font-weight:600">${exp.description}</div>
-          <div style="font-size:11px;color:var(--muted);margin-top:1px">${fmtDate(exp.date)}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:1px;display:flex;align-items:center;gap:6px">
+            <span>${fmtDate(exp.date)}</span>
+            ${exp.category ? `<span style="background:var(--surface2);padding:1px 7px;border-radius:99px;font-size:10px;font-weight:600;color:var(--muted2)">${exp.category}</span>` : ''}
+          </div>
         </div>
         <div style="display:flex;align-items:center;gap:9px">
           <span style="font-size:13px;font-weight:700;color:var(--red)">-${fmt(exp.amount)}</span>
