@@ -624,6 +624,11 @@ tbody td { padding:13px 18px; font-size:13px; vertical-align:middle; }
         Apólices
         <span class="badge" id="badge-list">0</span>
       </button>
+      <button class="nav-btn" data-tab="clients" onclick="navigate('clients')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+        Clientes
+        <span class="badge" id="badge-clients">0</span>
+      </button>
       <button class="nav-btn" data-tab="cashflow" onclick="navigate('cashflow')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
         Financeiro
@@ -948,6 +953,59 @@ tbody td { padding:13px 18px; font-size:13px; vertical-align:middle; }
         </table>
       </div>
     </section>
+
+    <!-- ── CLIENTS ── -->
+    <section class="page" id="page-clients">
+      <div class="page-header">
+        <div>
+          <h2 class="page-title syne">Clientes</h2>
+          <p class="page-sub" id="clients-sub">0 clientes</p>
+        </div>
+        <div class="page-header-actions">
+          <div class="search-wrap">
+            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="clients-search-input" placeholder="Buscar cliente..." oninput="renderClients()"/>
+            <button class="search-clear" id="clients-search-clear" onclick="clearClientsSearch()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Cliente</th>
+              <th>Contato</th>
+              <th style="text-align:center">Apólices</th>
+              <th>Última seguradora</th>
+              <th>Próx. vencimento</th>
+              <th style="color:var(--accent2)">Total ganho</th>
+              <th style="text-align:center">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="clients-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ── CLIENT DETAIL MODAL ── -->
+    <div id="client-detail-overlay" style="display:none;position:fixed;inset:0;z-index:250;align-items:center;justify-content:center;background:rgba(0,0,0,.55);padding:20px">
+      <div style="width:100%;max-width:600px;max-height:85vh;overflow-y:auto;background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:26px">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:18px">
+          <div>
+            <div class="syne" id="cd-name" style="font-size:19px;font-weight:700"></div>
+            <div id="cd-contact" style="font-size:12.5px;color:var(--muted);margin-top:3px"></div>
+          </div>
+          <button onclick="closeClientDetail()" style="background:none;border:none;color:var(--muted);cursor:pointer;padding:4px">
+            <svg style="width:18px;height:18px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div id="cd-summary" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px"></div>
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted2);margin-bottom:10px">Histórico de Apólices</div>
+        <div id="cd-policies" style="display:flex;flex-direction:column;gap:8px"></div>
+      </div>
+    </div>
 
     <!-- ── CASHFLOW ── -->
     <section class="page" id="page-cashflow">
@@ -1604,11 +1662,14 @@ function render() {
   renderBadge();
   if (activeTab==='dashboard') renderDashboard();
   if (activeTab==='list')      renderList();
+  if (activeTab==='clients')   renderClients();
   if (activeTab==='cashflow')  renderCashflow();
 }
 
 function renderBadge() {
   document.getElementById('badge-list').textContent = policies.length;
+  const uniqueClients = new Set(policies.map(p=>(p.clientName||'').trim().toUpperCase()).filter(Boolean));
+  document.getElementById('badge-clients').textContent = uniqueClients.size;
 }
 
 /* ── DASHBOARD ── */
@@ -2045,7 +2106,141 @@ function renderList() {
   }).join('');
 }
 
-/* ── CASHFLOW ── */
+/* ── CLIENTS ── */
+function getClientGroups() {
+  const groups = {};
+  policies.forEach(p => {
+    const key = (p.clientName||'').trim().toUpperCase();
+    if (!key) return;
+    if (!groups[key]) groups[key] = { name: p.clientName.trim(), contact: p.clientContact||'', policies: [] };
+    groups[key].policies.push(p);
+    // Mantém o contato mais recente preenchido, caso varie entre registros
+    if (p.clientContact && !groups[key].contact) groups[key].contact = p.clientContact;
+  });
+  return Object.values(groups);
+}
+
+function clearClientsSearch() {
+  document.getElementById('clients-search-input').value = '';
+  renderClients();
+}
+
+function renderClients() {
+  const search = (document.getElementById('clients-search-input')?.value||'').trim().toLowerCase();
+  let groups = getClientGroups();
+
+  if (search) {
+    groups = groups.filter(g =>
+      g.name.toLowerCase().includes(search) ||
+      (g.contact||'').toLowerCase().includes(search) ||
+      g.policies.some(p => (p.vehiclePlate||'').toLowerCase().includes(search) || (p.cpf||'').includes(search))
+    );
+  }
+  groups.sort((a,b) => a.name.localeCompare(b.name, 'pt-BR'));
+
+  document.getElementById('clients-sub').textContent = `${groups.length} cliente${groups.length===1?'':'s'}`;
+  document.getElementById('clients-search-clear').style.display = search ? 'block':'none';
+
+  const tbody = document.getElementById('clients-body');
+  if (!groups.length) {
+    tbody.innerHTML = `<tr><td colspan="7">
+      <div class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <span>Nenhum cliente encontrado</span>
+      </div></td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = groups.map(g => {
+    const sorted = [...g.policies].sort((a,b)=>new Date(b.validityStart||0)-new Date(a.validityStart||0));
+    const latest = sorted[0];
+    const totalEarning = g.policies.reduce((a,c)=>a+(c.brokerEarning||0),0);
+    // Próximo vencimento entre as apólices ativas/a vencer desse cliente
+    const upcoming = g.policies
+      .filter(p=>{ const s=getStatus(p.validityEnd).label; return s==='Ativo' || s==='A Vencer'; })
+      .sort((a,b)=>new Date(a.validityEnd||0)-new Date(b.validityEnd||0))[0];
+    const keyEsc = g.name.replace(/'/g,"\\'");
+    return `<tr style="cursor:pointer" onclick="openClientDetail('${keyEsc}')">
+      <td>
+        <div style="font-weight:600;font-size:13.5px">${g.name}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px">${latest?.cpf||''}</div>
+      </td>
+      <td>
+        <div style="font-size:12.5px;color:var(--muted2);display:flex;align-items:center;gap:4px">
+          <svg style="width:10px;height:10px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 01.22 1.22 2 2 0 012.18 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 7.91a16 16 0 006.06 6.06l1.27-.52a2 2 0 012.11.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+          ${g.contact || '—'}
+        </div>
+      </td>
+      <td style="text-align:center">
+        <span class="badge" style="position:static">${g.policies.length}</span>
+      </td>
+      <td><div style="font-size:13px;color:var(--muted2)">${latest?.insurer||'—'}</div></td>
+      <td>
+        ${upcoming ? `<div style="font-size:12px;color:var(--orange);font-weight:600">${fmtDate(upcoming.validityEnd)}</div>` : `<div style="font-size:12px;color:var(--muted)">—</div>`}
+      </td>
+      <td><div style="font-weight:700;font-size:14px;color:var(--accent2)">${fmt(totalEarning)}</div></td>
+      <td style="text-align:center" onclick="event.stopPropagation()">
+        <button class="act-btn edit" onclick="openClientDetail('${keyEsc}')" title="Ver histórico">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function openClientDetail(clientName) {
+  const groups = getClientGroups();
+  const group = groups.find(g => g.name === clientName);
+  if (!group) return;
+
+  const sorted = [...group.policies].sort((a,b)=>new Date(b.validityStart||0)-new Date(a.validityStart||0));
+  const totalEarning = group.policies.reduce((a,c)=>a+(c.brokerEarning||0),0);
+  const activeCount = group.policies.filter(p=>getStatus(p.validityEnd).label==='Ativo').length;
+
+  document.getElementById('cd-name').textContent = group.name;
+  document.getElementById('cd-contact').innerHTML = group.contact
+    ? `<a href="https://wa.me/55${group.contact.replace(/\D/g,'')}" target="_blank" style="color:var(--accent2);text-decoration:none">${group.contact}</a>`
+    : 'Sem contato registrado';
+
+  document.getElementById('cd-summary').innerHTML = `
+    <div style="background:var(--surface2);border-radius:10px;padding:10px;text-align:center">
+      <div style="font-size:18px;font-weight:700">${group.policies.length}</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:2px">Apólices</div>
+    </div>
+    <div style="background:var(--surface2);border-radius:10px;padding:10px;text-align:center">
+      <div style="font-size:18px;font-weight:700;color:var(--green)">${activeCount}</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:2px">Ativas</div>
+    </div>
+    <div style="background:var(--surface2);border-radius:10px;padding:10px;text-align:center">
+      <div style="font-size:15px;font-weight:700;color:var(--accent2)">${fmt(totalEarning)}</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:2px">Total Ganho</div>
+    </div>
+  `;
+
+  document.getElementById('cd-policies').innerHTML = sorted.map(p=>{
+    const s = getStatus(p.validityEnd);
+    return `<div style="background:var(--surface2);border-radius:10px;padding:11px 13px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <div style="font-size:13px;font-weight:600">${p.insurer||'—'} · ${p.vehicleModel||''}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:3px">${fmtDate(p.validityStart)} até ${fmtDate(p.validityEnd)}</div>
+        </div>
+        ${pillHTML(s)}
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+        <div style="font-size:11px;color:${isPaid(p.commissionStatus)?'var(--green)':'var(--orange)'};font-weight:600">${p.commissionStatus}</div>
+        <div style="font-size:13px;font-weight:700;color:var(--accent2)">${fmt(p.brokerEarning)}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('client-detail-overlay').style.display = 'flex';
+}
+
+function closeClientDetail() {
+  document.getElementById('client-detail-overlay').style.display = 'none';
+}
+
 /* ── CASHFLOW ── */
 let cashflowMonth = new Date().getMonth();
 let cashflowYear  = new Date().getFullYear();
