@@ -1016,6 +1016,12 @@ tbody td { padding:13px 18px; font-size:13px; vertical-align:middle; }
           </div>
         </div>
       </div>
+      <!-- Abas de filtro -->
+      <div style="display:flex;gap:7px;margin-bottom:16px;flex-wrap:wrap" id="clients-filter-chips">
+        <button class="filter-chip f-all" id="cf-all" onclick="setClientFilter('all')">Todos <span id="cfc-all">0</span></button>
+        <button class="filter-chip" id="cf-renewed" onclick="setClientFilter('renewed')">✅ Renovaram <span id="cfc-renewed" style="background:rgba(34,211,165,.2);color:var(--green)">0</span></button>
+        <button class="filter-chip" id="cf-not-renewed" onclick="setClientFilter('not-renewed')">⚠️ Não renovaram <span id="cfc-not-renewed" style="background:rgba(244,63,94,.15);color:var(--red)">0</span></button>
+      </div>
       <div class="table-wrap">
         <table>
           <thead>
@@ -1841,6 +1847,59 @@ function renderGoals(thisMonthCount, monthEarnings) {
   `;
 }
 
+/* ── TAXA DE RENOVAÇÃO ── */
+function calcRenewalRate() {
+  // Agrupa apólices por cliente
+  const groups = {};
+  policies.forEach(p => {
+    const key = (p.clientName||'').trim().toUpperCase();
+    if (!key) return;
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(p);
+  });
+
+  // Clientes com apólices vencidas (fim de vigência no passado)
+  const today = new Date(); today.setHours(0,0,0,0);
+  let totalWithExpired = 0;
+  let totalRenewed = 0;
+  const renewedClients = [];
+  const notRenewedClients = [];
+
+  Object.entries(groups).forEach(([key, clientPolicies]) => {
+    // Ordena por data de início
+    const sorted = clientPolicies
+      .filter(p=>p.validityStart && p.validityEnd)
+      .sort((a,b)=>new Date(a.validityStart)-new Date(b.validityStart));
+
+    if (sorted.length < 1) return;
+
+    // Verifica se tem alguma apólice vencida
+    const hasExpired = sorted.some(p => new Date(p.validityEnd) < today);
+    if (!hasExpired) return;
+
+    totalWithExpired++;
+
+    // Verifica se renovou: data de início de uma apólice está até 45 dias
+    // após o fim de outra apólice do mesmo cliente
+    let renewed = false;
+    for (let i=0; i<sorted.length-1; i++) {
+      const endA = new Date(sorted[i].validityEnd);
+      const startB = new Date(sorted[i+1].validityStart);
+      const diff = (startB - endA) / 86400000;
+      if (diff >= -15 && diff <= 45) { renewed = true; break; }
+    }
+
+    const latest = sorted[sorted.length-1];
+    const client = { name: clientPolicies[0].clientName, policies: sorted.length, insurer: latest.insurer, lastEnd: latest.validityEnd };
+
+    if (renewed) { totalRenewed++; renewedClients.push(client); }
+    else { notRenewedClients.push(client); }
+  });
+
+  const rate = totalWithExpired > 0 ? Math.round((totalRenewed/totalWithExpired)*100) : 0;
+  return { rate, totalRenewed, totalWithExpired, renewedClients, notRenewedClients };
+}
+
 /* ── Filtro de mês/ano do Dashboard ── */
 let dashboardMonth = new Date().getMonth();
 let dashboardYear  = new Date().getFullYear();
@@ -1956,6 +2015,56 @@ function renderDashboard() {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>
       </div>
       <div><div class="stat-label">Despesas</div><div class="stat-value" style="color:var(--red);font-size:20px">${fmt(totalExp)}</div></div>
+    </div>
+  `;
+
+  /* ═══ Card de taxa de renovação ═══ */
+  const renewal = calcRenewalRate();
+  const rateColor = renewal.rate >= 70 ? 'var(--green)' : renewal.rate >= 40 ? 'var(--orange)' : 'var(--red)';
+  const rateLabel = renewal.rate >= 70 ? 'Excelente' : renewal.rate >= 40 ? 'Regular' : 'Atenção';
+
+  // Injeta card extra de renovação antes dos kpis-extra (usa um slot separado)
+  let renewalCardEl = document.getElementById('dash-renewal-card');
+  if (!renewalCardEl) {
+    const el = document.createElement('div');
+    el.id = 'dash-renewal-card';
+    el.style.cssText = 'margin-bottom:22px';
+    document.getElementById('dash-kpis-extra').before(el);
+    renewalCardEl = el;
+  }
+  renewalCardEl.innerHTML = `
+    <div class="perf-card" style="padding:18px 20px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+        <svg style="width:14px;height:14px;color:${rateColor}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+        <span class="syne" style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted2)">Taxa de Renovação da Carteira</span>
+        <span style="margin-left:auto;font-size:11px;font-weight:700;color:${rateColor};background:${rateColor}22;padding:2px 10px;border-radius:99px">${rateLabel}</span>
+      </div>
+      <div style="display:grid;grid-template-columns:auto 1fr auto;gap:16px;align-items:center">
+        <div style="text-align:center">
+          <div style="font-size:38px;font-weight:800;color:${rateColor};line-height:1">${renewal.rate}%</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:4px">taxa geral</div>
+        </div>
+        <div>
+          <div style="height:10px;background:rgba(255,255,255,.07);border-radius:99px;overflow:hidden;margin-bottom:10px">
+            <div style="height:100%;width:${renewal.rate}%;background:${rateColor};border-radius:99px;transition:width .6s"></div>
+          </div>
+          <div style="display:flex;gap:20px">
+            <div>
+              <div style="font-size:18px;font-weight:700;color:var(--green)">${renewal.totalRenewed}</div>
+              <div style="font-size:11px;color:var(--muted)">renovaram</div>
+            </div>
+            <div>
+              <div style="font-size:18px;font-weight:700;color:var(--red)">${renewal.totalWithExpired - renewal.totalRenewed}</div>
+              <div style="font-size:11px;color:var(--muted)">não renovaram</div>
+            </div>
+            <div>
+              <div style="font-size:18px;font-weight:700;color:var(--muted2)">${renewal.totalWithExpired}</div>
+              <div style="font-size:11px;color:var(--muted)">elegíveis</div>
+            </div>
+          </div>
+        </div>
+        <button onclick="navigate('clients');showRenewalTab()" style="background:var(--accent);border:none;color:#fff;cursor:pointer;font-size:12px;font-weight:600;padding:8px 14px;border-radius:9px;font-family:inherit;white-space:nowrap">Ver detalhes →</button>
+      </div>
     </div>
   `;
 
@@ -2350,6 +2459,19 @@ function renderList() {
 }
 
 /* ── CLIENTS ── */
+let _clientFilter = 'all'; // 'all' | 'renewed' | 'not-renewed'
+
+function setClientFilter(filter) {
+  _clientFilter = filter;
+  document.querySelectorAll('#clients-filter-chips .filter-chip').forEach(b => b.classList.remove('f-all'));
+  const map = { 'all':'cf-all', 'renewed':'cf-renewed', 'not-renewed':'cf-not-renewed' };
+  document.getElementById(map[filter])?.classList.add('f-all');
+  renderClients();
+}
+
+function showRenewalTab() {
+  setClientFilter('not-renewed');
+}
 function getClientGroups() {
   const groups = {};
   policies.forEach(p => {
@@ -2371,6 +2493,26 @@ function clearClientsSearch() {
 function renderClients() {
   const search = (document.getElementById('clients-search-input')?.value||'').trim().toLowerCase();
   let groups = getClientGroups();
+  const renewal = calcRenewalRate();
+
+  // Monta sets de nomes renovados/não renovados
+  const renewedNames = new Set(renewal.renewedClients.map(c=>c.name.toUpperCase()));
+  const notRenewedNames = new Set(renewal.notRenewedClients.map(c=>c.name.toUpperCase()));
+
+  // Atualiza contadores das abas
+  const cfAll = document.getElementById('cfc-all');
+  const cfRenewed = document.getElementById('cfc-renewed');
+  const cfNotRenewed = document.getElementById('cfc-not-renewed');
+  if (cfAll) cfAll.textContent = groups.length;
+  if (cfRenewed) cfRenewed.textContent = renewal.totalRenewed;
+  if (cfNotRenewed) cfNotRenewed.textContent = renewal.totalWithExpired - renewal.totalRenewed;
+
+  // Aplica filtro de renovação
+  if (_clientFilter === 'renewed') {
+    groups = groups.filter(g => renewedNames.has(g.name.toUpperCase()));
+  } else if (_clientFilter === 'not-renewed') {
+    groups = groups.filter(g => notRenewedNames.has(g.name.toUpperCase()));
+  }
 
   if (search) {
     groups = groups.filter(g =>
@@ -2381,7 +2523,8 @@ function renderClients() {
   }
   groups.sort((a,b) => a.name.localeCompare(b.name, 'pt-BR'));
 
-  document.getElementById('clients-sub').textContent = `${groups.length} cliente${groups.length===1?'':'s'}`;
+  const label = _clientFilter==='renewed' ? 'renovaram' : _clientFilter==='not-renewed' ? 'não renovaram' : 'clientes';
+  document.getElementById('clients-sub').textContent = `${groups.length} ${label}`;
   document.getElementById('clients-search-clear').style.display = search ? 'block':'none';
 
   const tbody = document.getElementById('clients-body');
@@ -2398,14 +2541,21 @@ function renderClients() {
     const sorted = [...g.policies].sort((a,b)=>new Date(b.validityStart||0)-new Date(a.validityStart||0));
     const latest = sorted[0];
     const totalEarning = g.policies.reduce((a,c)=>a+(c.brokerEarning||0),0);
-    // Próximo vencimento entre as apólices ativas/a vencer desse cliente
     const upcoming = g.policies
       .filter(p=>{ const s=getStatus(p.validityEnd).label; return s==='Ativo' || s==='A Vencer'; })
       .sort((a,b)=>new Date(a.validityEnd||0)-new Date(b.validityEnd||0))[0];
     const keyEsc = g.name.replace(/'/g,"\\'");
+    const nameKey = g.name.toUpperCase();
+    const isRenewed = renewedNames.has(nameKey);
+    const isNotRenewed = notRenewedNames.has(nameKey);
+    const renewalBadge = isRenewed
+      ? `<span style="font-size:9.5px;font-weight:700;color:var(--green);background:rgba(34,211,165,.12);padding:1px 7px;border-radius:99px;margin-left:6px">✓ renovou</span>`
+      : isNotRenewed
+      ? `<span style="font-size:9.5px;font-weight:700;color:var(--red);background:rgba(244,63,94,.1);padding:1px 7px;border-radius:99px;margin-left:6px">✗ não renovou</span>`
+      : '';
     return `<tr style="cursor:pointer" onclick="openClientDetail('${keyEsc}')">
       <td>
-        <div style="font-weight:600;font-size:13.5px">${g.name}</div>
+        <div style="font-weight:600;font-size:13.5px;display:flex;align-items:center">${g.name}${renewalBadge}</div>
         <div style="font-size:11px;color:var(--muted);margin-top:2px">${latest?.cpf||''}</div>
       </td>
       <td>
