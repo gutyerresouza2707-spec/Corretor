@@ -728,7 +728,7 @@ tbody td { padding:13px 18px; font-size:13px; vertical-align:middle; }
         <div class="perf-card">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
             <svg style="width:15px;height:15px;color:var(--accent2)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-            <span class="syne" style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted2)">Fechamentos por Dia da Semana</span>
+            <span class="syne" style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted2)" id="chart-weekday-title">Fechamentos por Dia do Mês</span>
           </div>
           <div style="position:relative;width:100%;height:220px">
             <canvas id="chart-weekday"></canvas>
@@ -1983,21 +1983,56 @@ function renderDashboard() {
     </div>
   `;
 
-  /* ═══ Gráfico: fechamentos por dia da semana ═══ */
-  const byWeekday = [0,0,0,0,0,0,0];
-  thisMonth.forEach(p=>{ byWeekday[p._d.getDay()]++; });
-  const weekdayOrder = [1,2,3,4,5,6,0]; // Seg..Dom
+  /* ═══ Gráfico: fechamentos por dia do mês ═══ */
+  // Monta mapa de dia -> contagem
+  const byDay = {};
+  thisMonth.forEach(p=>{
+    const day = p._d.getDate();
+    byDay[day] = (byDay[day]||0) + 1;
+  });
+
+  // Gera todos os dias do mês selecionado
+  const daysInMonth = new Date(cy, cm+1, 0).getDate();
+  const dayLabels = [], dayData = [];
+  for (let d=1; d<=daysInMonth; d++) {
+    const date = new Date(cy, cm, d);
+    const weekName = DIAS_SEMANA_PT[date.getDay()];
+    dayLabels.push(`${weekName} ${String(d).padStart(2,'0')}`);
+    dayData.push(byDay[d]||0);
+  }
+
+  // Encontra o máximo para destacar
+  const maxVal = Math.max(...dayData, 0);
+  const barColors = dayData.map(v => v === maxVal && v > 0 ? '#f97316' : '#22d3a5');
+
+  // Atualiza título com o melhor dia
+  const titleEl = document.getElementById('chart-weekday-title');
+  if (titleEl && maxVal > 0) {
+    const bestDayIdx = dayData.indexOf(maxVal);
+    titleEl.textContent = `Fechamentos por Dia · Melhor: ${dayLabels[bestDayIdx]} (${maxVal} seguros)`;
+  } else if (titleEl) {
+    titleEl.textContent = `Fechamentos por Dia do Mês`;
+  }
+
   destroyChart('weekday');
   const ctxW = document.getElementById('chart-weekday');
   if (ctxW) {
     _charts.weekday = new Chart(ctxW, {
       type:'bar',
-      data:{ labels: weekdayOrder.map(i=>DIAS_SEMANA_PT[i]),
-        datasets:[{ data: weekdayOrder.map(i=>byWeekday[i]), backgroundColor:'#22d3a5', borderRadius:6 }] },
-      options:{ responsive:true, maintainAspectRatio:false,
-        plugins:{ legend:{display:false} },
-        scales:{ y:{ beginAtZero:true, ticks:{ precision:0, color:'#9999aa' }, grid:{color:'rgba(255,255,255,.06)'} },
-                 x:{ ticks:{ color:'#9999aa' }, grid:{display:false} } } }
+      data:{
+        labels: dayLabels,
+        datasets:[{ data: dayData, backgroundColor: barColors, borderRadius:4 }]
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{display:false},
+          tooltip:{ callbacks:{ title: items => items[0].label, label: items => `${items[0].raw} seguro${items[0].raw!==1?'s':''}` } }
+        },
+        scales:{
+          y:{ beginAtZero:true, ticks:{ precision:0, color:'#9999aa' }, grid:{color:'rgba(255,255,255,.06)'} },
+          x:{ ticks:{ color:'#9999aa', font:{size:9.5}, maxRotation:45, minRotation:45 }, grid:{display:false} }
+        }
+      }
     });
   }
 
