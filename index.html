@@ -776,6 +776,17 @@ tbody td { padding:13px 18px; font-size:13px; vertical-align:middle; }
         </div>
       </div>
 
+      <!-- Ranking completo de indicadores -->
+      <div class="perf-card" style="margin-bottom:22px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <svg style="width:15px;height:15px;color:var(--accent2)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+            <span class="syne" id="dash-referrers-full-title" style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--accent2)">Ranking de Indicadores</span>
+          </div>
+        </div>
+        <div id="dash-referrers-full" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px"></div>
+      </div>
+
       <!-- Bottom row -->
       <div class="grid-2-1" style="align-items:start">
         <!-- Desempenho -->
@@ -1036,6 +1047,26 @@ tbody td { padding:13px 18px; font-size:13px; vertical-align:middle; }
           </button>
         </div>
         <div id="cd-summary" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px"></div>
+
+        <!-- Observações -->
+        <div style="margin-bottom:20px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted2)">Observações</div>
+            <button onclick="addClientNote()" id="btn-add-note" style="background:none;border:1px solid var(--border);color:var(--accent2);cursor:pointer;font-size:11px;font-weight:600;padding:3px 10px;border-radius:7px;font-family:inherit">+ Adicionar</button>
+          </div>
+          <div id="cd-note-form" style="display:none;margin-bottom:10px">
+            <textarea id="cd-note-input" placeholder="Digite uma observação sobre este cliente..." rows="3"
+              style="width:100%;padding:10px 12px;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;color:var(--text);font-family:inherit;font-size:13px;resize:vertical;box-sizing:border-box"></textarea>
+            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:6px">
+              <button onclick="cancelClientNote()" style="background:none;border:1px solid var(--border);color:var(--muted2);cursor:pointer;font-size:11px;padding:5px 12px;border-radius:7px;font-family:inherit">Cancelar</button>
+              <button onclick="saveClientNote()" style="background:var(--accent);border:none;color:#fff;cursor:pointer;font-size:11px;font-weight:600;padding:5px 12px;border-radius:7px;font-family:inherit">Salvar</button>
+            </div>
+          </div>
+          <div id="cd-notes-list" style="display:flex;flex-direction:column;gap:8px">
+            <div style="font-size:12px;color:var(--muted);text-align:center;padding:10px 0">Carregando...</div>
+          </div>
+        </div>
+
         <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted2);margin-bottom:10px">Histórico de Apólices</div>
         <div id="cd-policies" style="display:flex;flex-direction:column;gap:8px"></div>
       </div>
@@ -2038,19 +2069,59 @@ function renderDashboard() {
 
   /* ═══ Top indicadores do mês ═══ */
   const byReferrer = {};
-  thisMonth.forEach(p=>{ const r=(p.referrer||'').trim(); if(r) byReferrer[r]=(byReferrer[r]||0)+1; });
-  const referrerRanked = Object.entries(byReferrer).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  thisMonth.forEach(p=>{
+    const r = (p.referrer||'').trim();
+    if (!r) return;
+    if (!byReferrer[r]) byReferrer[r] = { count:0, earning:0 };
+    byReferrer[r].count++;
+    byReferrer[r].earning += (p.brokerEarning||0);
+  });
+  const referrerRanked = Object.entries(byReferrer).sort((a,b)=>b[1].count-a[1].count).slice(0,8);
   const refList = document.getElementById('dash-referrers');
   if (refList) {
-    refList.innerHTML = referrerRanked.length ? referrerRanked.map(([name,count])=>`
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:rgba(255,255,255,.025);border-radius:9px;margin-bottom:7px">
-        <span style="font-size:12.5px;color:var(--muted2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:65%">${name}</span>
-        <span style="font-size:12.5px;font-weight:700;color:var(--accent2)">${count} indicaç${count===1?'ão':'ões'}</span>
-      </div>`).join('') :
-      `<div class="empty-state" style="padding:20px 0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 014-4h4a4 4 0 014 4v2"/></svg><span>Nenhuma indicação este mês</span></div>`;
+    refList.innerHTML = referrerRanked.length ? referrerRanked.map(([name,data], idx)=>{
+      const medal = idx===0?'🥇':idx===1?'🥈':idx===2?'🥉':'';
+      return `<div style="padding:9px 12px;background:rgba(255,255,255,.025);border-radius:9px;margin-bottom:7px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+          <span style="font-size:12.5px;color:var(--muted2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:70%">${medal} ${name}</span>
+          <span style="font-size:12.5px;font-weight:700;color:var(--accent2)">${data.count} indicaç${data.count===1?'ão':'ões'}</span>
+        </div>
+        <div style="font-size:11px;color:var(--green);font-weight:600">${fmt(data.earning)} gerado</div>
+      </div>`;
+    }).join('') :
+    `<div class="empty-state" style="padding:20px 0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 014-4h4a4 4 0 014 4v2"/></svg><span>Nenhuma indicação este mês</span></div>`;
   }
 
-  /* ═══ Gráfico: comparativo mensal ano atual vs anterior ═══ */
+  /* ═══ Ranking completo de indicadores ═══ */
+  const fullTitle = document.getElementById('dash-referrers-full-title');
+  if (fullTitle) fullTitle.textContent = `Ranking de Indicadores — ${MESES_PT[cm]}/${cy}`;
+
+  const refFullEl = document.getElementById('dash-referrers-full');
+  if (refFullEl) {
+    const allReferrers = Object.entries(byReferrer).sort((a,b)=>b[1].earning-a[1].earning);
+    if (!allReferrers.length) {
+      refFullEl.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:12px 0;font-size:13px;color:var(--muted)">Nenhuma indicação registrada neste mês.</div>`;
+    } else {
+      const maxEarning = allReferrers[0][1].earning;
+      refFullEl.innerHTML = allReferrers.map(([name, data], idx)=>{
+        const pct = maxEarning > 0 ? (data.earning / maxEarning * 100).toFixed(0) : 0;
+        const medal = idx===0?'🥇':idx===1?'🥈':idx===2?'🥉':`${idx+1}º`;
+        return `<div style="background:rgba(255,255,255,.025);border-radius:10px;padding:11px 13px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+            <div style="display:flex;align-items:center;gap:7px">
+              <span style="font-size:13px">${medal}</span>
+              <span style="font-size:12.5px;font-weight:600;color:var(--muted2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px" title="${name}">${name}</span>
+            </div>
+            <span style="font-size:11px;color:var(--muted);flex-shrink:0">${data.count} seg.</span>
+          </div>
+          <div style="height:5px;background:rgba(255,255,255,.06);border-radius:99px;overflow:hidden;margin-bottom:6px">
+            <div style="height:100%;width:${pct}%;background:var(--accent2);border-radius:99px"></div>
+          </div>
+          <div style="font-size:13px;font-weight:700;color:var(--green)">${fmt(data.earning)}</div>
+        </div>`;
+      }).join('');
+    }
+  }
   const monthlyThisYear = Array(12).fill(0);
   const monthlyLastYear = Array(12).fill(0);
   thisYearPolicies.forEach(p=>{ monthlyThisYear[p._d.getMonth()]++; });
@@ -2365,6 +2436,8 @@ function openClientDetail(clientName) {
   const group = groups.find(g => g.name === clientName);
   if (!group) return;
 
+  _currentDetailClient = group.name;
+
   const sorted = [...group.policies].sort((a,b)=>new Date(b.validityStart||0)-new Date(a.validityStart||0));
   const totalEarning = group.policies.reduce((a,c)=>a+(c.brokerEarning||0),0);
   const activeCount = group.policies.filter(p=>getStatus(p.validityEnd).label==='Ativo').length;
@@ -2415,10 +2488,92 @@ function openClientDetail(clientName) {
   }).join('');
 
   document.getElementById('client-detail-overlay').style.display = 'flex';
+  document.getElementById('cd-note-form').style.display = 'none';
+  document.getElementById('cd-note-input').value = '';
+  loadClientNotes(group.name);
 }
 
 function closeClientDetail() {
   document.getElementById('client-detail-overlay').style.display = 'none';
+  _currentDetailClient = null;
+}
+
+/* ── OBSERVAÇÕES DE CLIENTES ── */
+let _currentDetailClient = null;
+let _clientNotes = [];
+
+async function loadClientNotes(clientName) {
+  const notesList = document.getElementById('cd-notes-list');
+  if (!notesList) return;
+  if (!window._sb || !window._sbUser || window._sbOffline) {
+    notesList.innerHTML = `<div style="font-size:12px;color:var(--muted);text-align:center;padding:8px 0">Observações disponíveis apenas com conexão ao banco.</div>`;
+    return;
+  }
+  const { data, error } = await window._sb.client
+    .from('client_notes')
+    .select('*')
+    .eq('client_name', clientName)
+    .order('created_at', { ascending: false });
+  if (error) { console.warn(error); return; }
+  _clientNotes = data || [];
+  renderClientNotes();
+}
+
+function renderClientNotes() {
+  const notesList = document.getElementById('cd-notes-list');
+  if (!notesList) return;
+  if (!_clientNotes.length) {
+    notesList.innerHTML = `<div style="font-size:12px;color:var(--muted);text-align:center;padding:8px 0">Nenhuma observação ainda.</div>`;
+    return;
+  }
+  notesList.innerHTML = _clientNotes.map(n => {
+    const date = new Date(n.created_at).toLocaleDateString('pt-BR');
+    return `<div style="background:var(--surface2);border-radius:10px;padding:10px 12px;position:relative">
+      <div style="font-size:13px;color:var(--text);line-height:1.5;white-space:pre-wrap">${n.note}</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px">
+        <div style="font-size:10px;color:var(--muted)">${date}</div>
+        <button onclick="deleteClientNote('${n.id}')" title="Excluir observação"
+          style="background:none;border:none;color:var(--muted);cursor:pointer;padding:2px;border-radius:5px;display:flex;transition:color .14s"
+          onmouseenter="this.style.color='var(--red)'" onmouseleave="this.style.color='var(--muted)'">
+          <svg style="width:12px;height:12px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+        </button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function addClientNote() {
+  document.getElementById('cd-note-form').style.display = 'block';
+  document.getElementById('cd-note-input').focus();
+}
+
+function cancelClientNote() {
+  document.getElementById('cd-note-form').style.display = 'none';
+  document.getElementById('cd-note-input').value = '';
+}
+
+async function saveClientNote() {
+  const note = document.getElementById('cd-note-input').value.trim();
+  if (!note || !_currentDetailClient) return;
+  if (!window._sb || !window._sbUser) return;
+  const { error } = await window._sb.client.from('client_notes').insert({
+    client_name: _currentDetailClient,
+    note,
+    user_id: window._sbUser.id,
+    created_at: Date.now(),
+    updated_at: Date.now()
+  });
+  if (error) { console.warn(error); showNotif('Erro ao salvar observação.'); return; }
+  cancelClientNote();
+  await loadClientNotes(_currentDetailClient);
+  showNotif('Observação salva!');
+}
+
+async function deleteClientNote(id) {
+  if (!window._sb) return;
+  const { error } = await window._sb.client.from('client_notes').delete().eq('id', id);
+  if (error) { console.warn(error); return; }
+  await loadClientNotes(_currentDetailClient);
 }
 
 /* ── CASHFLOW ── */
