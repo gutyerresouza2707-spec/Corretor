@@ -689,6 +689,40 @@ tbody td { padding:13px 18px; font-size:13px; vertical-align:middle; }
       <!-- Comparativos extras -->
       <div class="grid-4" style="margin-bottom:22px" id="dash-kpis-extra"></div>
 
+      <!-- Metas mensais -->
+      <div class="perf-card" style="margin-bottom:22px" id="dash-goals-block">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <svg style="width:15px;height:15px;color:var(--accent2)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+            <span class="syne" style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--accent2)" id="dash-goals-title">Metas do Mês</span>
+          </div>
+          <button onclick="toggleGoalEdit()" id="btn-goal-edit" style="background:none;border:1px solid var(--border);color:var(--muted2);cursor:pointer;font-size:11px;font-weight:600;padding:4px 10px;border-radius:8px;font-family:inherit;transition:all .14s" onmouseenter="this.style.borderColor='var(--accent2)';this.style.color='var(--accent2)'" onmouseleave="this.style.borderColor='var(--border)';this.style.color='var(--muted2)'">
+            ✎ Editar metas
+          </button>
+        </div>
+
+        <!-- Formulário de edição (oculto por padrão) -->
+        <div id="goal-edit-form" style="display:none;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:16px">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+            <div>
+              <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted2);display:block;margin-bottom:6px">Meta de seguros (quantidade)</label>
+              <input type="number" id="goal-qty-input" min="1" placeholder="Ex: 80" style="width:100%;padding:9px 12px;background:var(--surface2);border:1px solid var(--border2);border-radius:9px;color:var(--text);font-family:inherit;font-size:13.5px"/>
+            </div>
+            <div>
+              <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted2);display:block;margin-bottom:6px">Meta de comissão (R$)</label>
+              <input type="number" id="goal-val-input" min="0" step="100" placeholder="Ex: 3000" style="width:100%;padding:9px 12px;background:var(--surface2);border:1px solid var(--border2);border-radius:9px;color:var(--text);font-family:inherit;font-size:13.5px"/>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button onclick="cancelGoalEdit()" style="background:none;border:1px solid var(--border);color:var(--muted2);cursor:pointer;font-size:12px;padding:7px 14px;border-radius:8px;font-family:inherit">Cancelar</button>
+            <button onclick="saveGoals()" style="background:var(--accent);border:none;color:#fff;cursor:pointer;font-size:12px;font-weight:600;padding:7px 14px;border-radius:8px;font-family:inherit">Salvar metas</button>
+          </div>
+        </div>
+
+        <!-- Barras de progresso -->
+        <div id="dash-goals-bars" style="display:grid;grid-template-columns:1fr 1fr;gap:20px"></div>
+      </div>
+
       <!-- Dia da semana + Indicadores -->
       <div class="grid-2-1" style="align-items:start;margin-bottom:22px">
         <div class="perf-card">
@@ -1694,6 +1728,88 @@ function countWorkdays(start, end) {
   return wd;
 }
 
+/* ── METAS MENSAIS ── */
+const LS_GOALS = 'corretor_goals';
+
+function loadGoals() {
+  try { return JSON.parse(localStorage.getItem(LS_GOALS)) || { qty: 0, val: 0 }; } catch { return { qty:0, val:0 }; }
+}
+function saveGoals() {
+  const qty = parseInt(document.getElementById('goal-qty-input').value)||0;
+  const val = parseFloat(document.getElementById('goal-val-input').value)||0;
+  localStorage.setItem(LS_GOALS, JSON.stringify({qty, val}));
+  toggleGoalEdit();
+  renderDashboard();
+  showNotif('Metas salvas!');
+}
+function toggleGoalEdit() {
+  const form = document.getElementById('goal-edit-form');
+  const isOpen = form.style.display !== 'none';
+  form.style.display = isOpen ? 'none' : 'block';
+  if (!isOpen) {
+    const goals = loadGoals();
+    document.getElementById('goal-qty-input').value = goals.qty || '';
+    document.getElementById('goal-val-input').value = goals.val || '';
+  }
+}
+function cancelGoalEdit() {
+  document.getElementById('goal-edit-form').style.display = 'none';
+}
+
+function renderGoals(thisMonthCount, monthEarnings) {
+  const goals = loadGoals();
+  const barsEl = document.getElementById('dash-goals-bars');
+  const titleEl = document.getElementById('dash-goals-title');
+  if (!barsEl) return;
+
+  if (!goals.qty && !goals.val) {
+    barsEl.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:12px 0;font-size:13px;color:var(--muted)">Nenhuma meta definida ainda. Clique em <strong style="color:var(--accent2)">Editar metas</strong> para começar.</div>`;
+    if (titleEl) titleEl.textContent = 'Metas do Mês';
+    return;
+  }
+
+  const pctQty = goals.qty > 0 ? Math.min((thisMonthCount / goals.qty) * 100, 100) : 0;
+  const pctVal = goals.val > 0 ? Math.min((monthEarnings / goals.val) * 100, 100) : 0;
+
+  const bar = (pct, color) => `
+    <div style="height:8px;background:rgba(255,255,255,.07);border-radius:99px;overflow:hidden;margin:10px 0 6px">
+      <div style="height:100%;width:${pct.toFixed(1)}%;background:${color};border-radius:99px;transition:width .5s"></div>
+    </div>`;
+
+  const colorQty = pctQty >= 100 ? 'var(--green)' : pctQty >= 70 ? 'var(--accent2)' : 'var(--orange)';
+  const colorVal = pctVal >= 100 ? 'var(--green)' : pctVal >= 70 ? 'var(--accent2)' : 'var(--orange)';
+
+  if (titleEl) {
+    const avg = ((pctQty + pctVal) / 2).toFixed(0);
+    titleEl.textContent = `Metas do Mês — ${avg}% concluído`;
+  }
+
+  barsEl.innerHTML = `
+    <div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline">
+        <span style="font-size:12px;color:var(--muted2);font-weight:600">Seguros fechados</span>
+        <span style="font-size:11px;color:${colorQty};font-weight:700">${pctQty.toFixed(0)}%</span>
+      </div>
+      ${bar(pctQty, colorQty)}
+      <div style="display:flex;justify-content:space-between">
+        <span style="font-size:22px;font-weight:700;color:${colorQty}">${thisMonthCount}</span>
+        <span style="font-size:12px;color:var(--muted);align-self:flex-end;margin-bottom:2px">meta: ${goals.qty}</span>
+      </div>
+    </div>
+    <div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline">
+        <span style="font-size:12px;color:var(--muted2);font-weight:600">Comissão recebida</span>
+        <span style="font-size:11px;color:${colorVal};font-weight:700">${pctVal.toFixed(0)}%</span>
+      </div>
+      ${bar(pctVal, colorVal)}
+      <div style="display:flex;justify-content:space-between">
+        <span style="font-size:18px;font-weight:700;color:${colorVal}">${fmt(monthEarnings)}</span>
+        <span style="font-size:12px;color:var(--muted);align-self:flex-end;margin-bottom:2px">meta: ${fmt(goals.val)}</span>
+      </div>
+    </div>
+  `;
+}
+
 /* ── Filtro de mês/ano do Dashboard ── */
 let dashboardMonth = new Date().getMonth();
 let dashboardYear  = new Date().getFullYear();
@@ -1830,6 +1946,9 @@ function renderDashboard() {
   const wd = countWorkdays(new Date(cy,cm,1), monthEnd);
   const avg = (thisMonth.length/(wd||1)).toFixed(1);
   const monthEarnings = thisMonth.reduce((a,c)=>a+(c.brokerEarning||0),0);
+
+  // Renderiza barras de progresso das metas
+  renderGoals(thisMonth.length, monthEarnings);
 
   const pctChange = (curr, prev) => prev===0 ? (curr>0?100:0) : Math.round(((curr-prev)/prev)*100);
   const momChange = pctChange(thisMonth.length, prevMonth.length);
