@@ -900,12 +900,12 @@ tbody td { padding:13px 18px; font-size:13px; vertical-align:middle; }
                 <input required type="number" step="0.01" name="premiumAmount" id="f-premiumAmount" placeholder="0,00" oninput="calcCommission()"/>
               </div>
               <div class="field">
-                <label>% Com. Seguradora</label>
-                <input required type="number" step="0.1" name="commissionRate" id="f-commissionRate" placeholder="Ex: 15" oninput="calcCommission()"/>
+                <label>% Com. Seguradora <span style="color:var(--muted);font-weight:400;text-transform:none">(opcional)</span></label>
+                <input type="number" step="0.1" name="commissionRate" id="f-commissionRate" placeholder="Ex: 15" oninput="calcCommission()"/>
               </div>
               <div class="field">
-                <label>Valor da Parcela (R$)</label>
-                <input required type="number" step="0.01" name="monthlyInstallment" id="f-monthlyInstallment" placeholder="0,00"/>
+                <label>Valor da Parcela (R$) <span style="color:var(--muted);font-weight:400;text-transform:none">(opcional)</span></label>
+                <input type="number" step="0.01" name="monthlyInstallment" id="f-monthlyInstallment" placeholder="0,00"/>
               </div>
               <div class="field">
                 <label>Forma de Pagamento</label>
