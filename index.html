@@ -1886,7 +1886,10 @@ function renderGoals(thisMonthCount, monthEarnings) {
 
 /* ── TAXA DE RENOVAÇÃO ── */
 function calcRenewalRate() {
-  const isAtive = ins => (ins||'').toLowerCase().includes('ative');
+  const isAtive = ins => {
+    const s = (ins||'').toLowerCase();
+    return s.includes('ativ'); // captura Ativo, Ative, Seguro Ativo, Seguro Ative
+  };
 
   // Agrupa apólices por cliente
   const groups = {};
@@ -2033,6 +2036,10 @@ function renderDashboard() {
 
   const allMonths = dashboardMonth === -1;
   const allYears  = dashboardYear  === 0;
+
+  // Controla visibilidade do seletor de anos do gráfico mensal
+  const yearSelEl = document.getElementById('chart-year-selectors');
+  if (yearSelEl) yearSelEl.style.display = allMonths ? 'none' : 'flex';
 
   // Filtra pelo mês/ano selecionado (suporta "Todos")
   const policiesInSelectedMonth = policies.filter(p=>{
@@ -2334,7 +2341,6 @@ function renderDashboard() {
   const {minY: minYearChart, maxY: maxYearChart} = getDashboardYearRange();
   const yearSelA = document.getElementById('chart-year-a');
   const yearSelB = document.getElementById('chart-year-b');
-  const yearSelectors = document.getElementById('chart-year-selectors');
 
   if (yearSelA && yearSelB) {
     const yearsKey = `${minYearChart}-${maxYearChart}`;
@@ -2343,14 +2349,11 @@ function renderDashboard() {
       for (let y=maxYearChart; y>=minYearChart; y--) opts.push(`<option value="${y}">${y}</option>`);
       yearSelA.innerHTML = opts.join('');
       yearSelB.innerHTML = opts.join('');
-      // Padrão: A = ano anterior, B = ano atual
       yearSelA.value = String(maxYearChart - 1);
       yearSelB.value = String(maxYearChart);
       yearSelA.dataset.range = yearsKey;
     }
   }
-  // Esconde seletores no modo "Todos os meses" (já mostra todos os anos)
-  if (yearSelectors) yearSelectors.style.display = allMonths ? 'none' : 'flex';
 
   const selectedYearA = yearSelA ? parseInt(yearSelA.value) : py;
   const selectedYearB = yearSelB ? parseInt(yearSelB.value) : cy;
@@ -2521,8 +2524,8 @@ function renderDashboard() {
   }
 
   // Separa Seguro Ative (automático) das demais
-  const ativeRenewals = renewals.filter(p=>(p.insurer||'').toLowerCase().includes('ative'));
-  const otherRenewals = renewals.filter(p=>!(p.insurer||'').toLowerCase().includes('ative'));
+  const ativeRenewals = renewals.filter(p=>(p.insurer||'').toLowerCase().includes('ativ'));
+  const otherRenewals = renewals.filter(p=>!(p.insurer||'').toLowerCase().includes('ativ'));
 
   // Dashboard de renovações por seguradora
   const byInsurerRenewal = {};
