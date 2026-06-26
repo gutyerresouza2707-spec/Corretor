@@ -747,7 +747,7 @@ tbody td { padding:13px 18px; font-size:13px; vertical-align:middle; }
       <div class="perf-card" style="margin-bottom:22px">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
           <svg style="width:15px;height:15px;color:var(--accent2)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-          <span class="syne" style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted2)">Seguros Fechados por Mês — Ano Atual vs Anterior</span>
+          <span class="syne" id="chart-monthly-title" style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted2)">Seguros Fechados por Mês — Ano Atual vs Anterior</span>
         </div>
         <div style="position:relative;width:100%;height:240px">
           <canvas id="chart-monthly"></canvas>
@@ -2289,25 +2289,83 @@ function renderDashboard() {
       }).join('');
     }
   }
-  const monthlyThisYear = Array(12).fill(0);
-  const monthlyLastYear = Array(12).fill(0);
-  thisYearPolicies.forEach(p=>{ monthlyThisYear[p._d.getMonth()]++; });
-  lastYearPolicies.forEach(p=>{ monthlyLastYear[p._d.getMonth()]++; });
+  /* ═══ Gráfico: comparativo mensal / anual ═══ */
+  const monthlyTitleEl = document.getElementById('chart-monthly-title');
   destroyChart('monthly');
   const ctxM = document.getElementById('chart-monthly');
   if (ctxM) {
-    _charts.monthly = new Chart(ctxM, {
-      type:'bar',
-      data:{ labels: MESES_PT,
-        datasets:[
-          { label:String(py), data: monthlyLastYear, backgroundColor:'rgba(167,139,250,.35)', borderRadius:5 },
-          { label:String(cy), data: monthlyThisYear, backgroundColor:'#6c63ff', borderRadius:5 }
-        ]},
-      options:{ responsive:true, maintainAspectRatio:false,
-        plugins:{ legend:{ display:true, position:'top', labels:{ color:'#9999aa', boxWidth:11, font:{size:11} } } },
-        scales:{ y:{ beginAtZero:true, ticks:{precision:0, color:'#9999aa'}, grid:{color:'rgba(255,255,255,.06)'} },
-                 x:{ ticks:{color:'#9999aa'}, grid:{display:false} } } }
-    });
+    // Plugin inline para mostrar quantidade em cima de cada barra
+    const datalabelsPlugin = {
+      id: 'datalabels',
+      afterDatasetsDraw(chart) {
+        const ctx2 = chart.ctx;
+        chart.data.datasets.forEach((dataset, i) => {
+          const meta = chart.getDatasetMeta(i);
+          if (meta.hidden) return;
+          meta.data.forEach((bar, j) => {
+            const val = dataset.data[j];
+            if (!val) return;
+            ctx2.save();
+            ctx2.fillStyle = '#ccccdd';
+            ctx2.font = '10px Inter, sans-serif';
+            ctx2.textAlign = 'center';
+            ctx2.textBaseline = 'bottom';
+            ctx2.fillText(val, bar.x, bar.y - 2);
+            ctx2.restore();
+          });
+        });
+      }
+    };
+
+    if (allMonths) {
+      // Modo "Todos os meses": compara totais por ano (2024, 2025, 2026...)
+      const policiesAll = policies.map(p=>({...p, _d: parseValidityStart(p)})).filter(p=>p._d);
+      const {minY: minYear} = getDashboardYearRange();
+      const maxYear = new Date().getFullYear();
+      const years = [];
+      for (let y=minYear; y<=maxYear; y++) years.push(y);
+      const colors = ['rgba(167,139,250,.5)','#6c63ff','#22d3a5','#f97316','#f43f5e'];
+      const datasets = years.map((y,i)=>({
+        label: String(y),
+        data: MESES_PT.map((_,m)=> policiesAll.filter(p=>p._d.getFullYear()===y && p._d.getMonth()===m).length),
+        backgroundColor: colors[i%colors.length],
+        borderRadius: 5
+      }));
+      if (monthlyTitleEl) monthlyTitleEl.textContent = 'Seguros Fechados por Mês — Comparativo Anual';
+      _charts.monthly = new Chart(ctxM, {
+        type:'bar',
+        plugins: [datalabelsPlugin],
+        data:{ labels: MESES_PT, datasets },
+        options:{ responsive:true, maintainAspectRatio:false,
+          plugins:{ legend:{ display:true, position:'top', labels:{ color:'#9999aa', boxWidth:11, font:{size:11} } },
+            tooltip:{ callbacks:{ label: ctx=>` ${ctx.dataset.label}: ${ctx.raw} seguros` } }
+          },
+          scales:{ y:{ beginAtZero:true, ticks:{precision:0, color:'#9999aa'}, grid:{color:'rgba(255,255,255,.06)'} },
+                   x:{ ticks:{color:'#9999aa'}, grid:{display:false} } } }
+      });
+    } else {
+      // Modo normal: mês a mês, ano atual vs anterior
+      const monthlyThisYear = Array(12).fill(0);
+      const monthlyLastYear = Array(12).fill(0);
+      thisYearPolicies.forEach(p=>{ monthlyThisYear[p._d.getMonth()]++; });
+      lastYearPolicies.forEach(p=>{ monthlyLastYear[p._d.getMonth()]++; });
+      if (monthlyTitleEl) monthlyTitleEl.textContent = `Seguros Fechados por Mês — ${allYears?'Todos os Anos':`${cy} vs ${py}`}`;
+      _charts.monthly = new Chart(ctxM, {
+        type:'bar',
+        plugins: [datalabelsPlugin],
+        data:{ labels: MESES_PT,
+          datasets:[
+            { label:String(py), data: monthlyLastYear, backgroundColor:'rgba(167,139,250,.35)', borderRadius:5 },
+            { label:allYears?'Todos':String(cy), data: monthlyThisYear, backgroundColor:'#6c63ff', borderRadius:5 }
+          ]},
+        options:{ responsive:true, maintainAspectRatio:false,
+          plugins:{ legend:{ display:true, position:'top', labels:{ color:'#9999aa', boxWidth:11, font:{size:11} } },
+            tooltip:{ callbacks:{ label: ctx=>` ${ctx.dataset.label}: ${ctx.raw} seguros` } }
+          },
+          scales:{ y:{ beginAtZero:true, ticks:{precision:0, color:'#9999aa'}, grid:{color:'rgba(255,255,255,.06)'} },
+                   x:{ ticks:{color:'#9999aa'}, grid:{display:false} } } }
+      });
+    }
   }
 
   /* ═══ Gráficos: seguradoras mês x mês e ano x ano ═══ */
