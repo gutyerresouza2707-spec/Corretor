@@ -1900,7 +1900,7 @@ function renderGoals(thisMonthCount, monthEarnings) {
     </div>
     <div>
       <div style="display:flex;justify-content:space-between;align-items:baseline">
-        <span style="font-size:12px;color:var(--muted2);font-weight:600">Comissão recebida</span>
+        <span style="font-size:12px;color:var(--muted2);font-weight:600">Comissão a receber</span>
         <span style="font-size:11px;color:${colorVal};font-weight:700">${pctVal.toFixed(0)}%</span>
       </div>
       ${bar(pctVal, colorVal)}
@@ -2376,8 +2376,9 @@ function renderDashboard() {
   const wd = (allMonths||allYears||selectedMonths.length>1||selectedYears.length>1) ? null : countWorkdays(new Date(refY,refM,1), monthEnd);
   const avg = wd ? (thisMonth.length/wd).toFixed(1) : '—';
   const monthEarnings = thisMonth.filter(p=>isPaid(p.commissionStatus)).reduce((a,c)=>a+(c.brokerEarning||0),0);
+  const monthEarningsPending = thisMonth.filter(p=>p.commissionStatus==='Pendente').reduce((a,c)=>a+(c.brokerEarning||0),0);
 
-  renderGoals(thisMonth.length, monthEarnings);
+  renderGoals(thisMonth.length, monthEarningsPending);
 
   const pctChange = (curr, prev) => prev===0 ? (curr>0?100:0) : Math.round(((curr-prev)/prev)*100);
   const momChange = pctChange(thisMonth.length, prevMonth.length);
