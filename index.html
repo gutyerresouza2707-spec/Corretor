@@ -670,17 +670,35 @@ tbody td { padding:13px 18px; font-size:13px; vertical-align:middle; }
         </div>
       </div>
 
-      <!-- Filtro de mês/ano -->
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:22px">
-        <button onclick="changeDashboardMonth(-1)" title="Mês anterior" style="background:var(--surface);border:1px solid var(--border);color:var(--muted2);cursor:pointer;width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;transition:background .14s" onmouseenter="this.style.background='var(--surface2)'" onmouseleave="this.style.background='var(--surface)'">
-          <svg style="width:15px;height:15px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+      <!-- Filtro de mês/ano com checkboxes -->
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:22px;position:relative">
+        <button onclick="toggleFilterPanel()" id="btn-filter-period"
+          style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:8px 16px;border-radius:9px;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;min-width:180px">
+          <svg style="width:14px;height:14px;color:var(--accent2)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          <span id="filter-period-label">Jun/2026</span>
+          <svg style="width:12px;height:12px;margin-left:auto;color:var(--muted)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
         </button>
-        <select id="dash-month-select" onchange="onDashboardMonthSelect()" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:9px;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;min-width:120px"></select>
-        <select id="dash-year-select" onchange="onDashboardYearSelect()" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:9px;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;min-width:90px"></select>
-        <button onclick="changeDashboardMonth(1)" title="Próximo mês" style="background:var(--surface);border:1px solid var(--border);color:var(--muted2);cursor:pointer;width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;transition:background .14s" onmouseenter="this.style.background='var(--surface2)'" onmouseleave="this.style.background='var(--surface)'">
-          <svg style="width:15px;height:15px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-        </button>
-        <button onclick="resetDashboardMonth()" title="Voltar para o mês atual" style="background:none;border:none;color:var(--accent2);cursor:pointer;font-size:12px;font-weight:600;padding:8px 6px">Hoje</button>
+        <button onclick="resetDashboardMonth()" style="background:none;border:none;color:var(--accent2);cursor:pointer;font-size:12px;font-weight:600;padding:8px 6px">Hoje</button>
+
+        <!-- Painel de seleção -->
+        <div id="filter-panel" style="display:none;position:absolute;top:46px;left:0;z-index:200;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;box-shadow:0 8px 32px rgba(0,0,0,.4);min-width:320px">
+          <div style="display:flex;gap:16px">
+            <!-- Anos -->
+            <div style="flex:1">
+              <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted2);margin-bottom:10px">Ano</div>
+              <div id="filter-years" style="display:flex;flex-direction:column;gap:6px"></div>
+            </div>
+            <!-- Meses -->
+            <div style="flex:2">
+              <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted2);margin-bottom:10px">Mês</div>
+              <div id="filter-months" style="display:grid;grid-template-columns:1fr 1fr;gap:6px"></div>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
+            <button onclick="selectAllPeriod()" style="flex:1;background:var(--surface2);border:1px solid var(--border);color:var(--muted2);cursor:pointer;font-size:11px;font-weight:600;padding:6px;border-radius:7px;font-family:inherit">Todos</button>
+            <button onclick="applyFilterPanel()" style="flex:2;background:var(--accent);border:none;color:#fff;cursor:pointer;font-size:12px;font-weight:600;padding:7px;border-radius:7px;font-family:inherit">Aplicar</button>
+          </div>
+        </div>
       </div>
 
       <!-- KPIs -->
@@ -1518,7 +1536,7 @@ function autoEndDate() {
 
 /* ── Comissão fixa por seguradora (preenche "Seu Ganho" automaticamente) ── */
 const FIXED_COMMISSION_BY_INSURER = [
-  { match: ['ative'],                         value: 50.00 },
+  { match: ['ativ'],                          value: 50.00 }, // Ative Motos, Ativo, Seguro Ativo
   { match: ['suhai'],                         value: 10.00 },
   { match: ['tokio'],                         value: 35.00 },
   { match: ['allianz'],                       value: 35.00 },
@@ -1969,9 +1987,166 @@ const datalabelsPlugin = {
   }
 };
 
-/* ── Filtro de mês/ano do Dashboard ── */
-let dashboardMonth = new Date().getMonth();
-let dashboardYear  = new Date().getFullYear();
+/* ── Filtro de mês/ano com checkboxes ── */
+// selectedMonths: array de 0-11, vazio = todos
+// selectedYears: array de anos, vazio = todos
+let selectedMonths = [new Date().getMonth()];
+let selectedYears  = [new Date().getFullYear()];
+// Mantém compatibilidade com código legado
+let dashboardMonth = selectedMonths[0];
+let dashboardYear  = selectedYears[0];
+
+function toggleFilterPanel() {
+  const panel = document.getElementById('filter-panel');
+  if (panel.style.display === 'none') {
+    openFilterPanel();
+  } else {
+    panel.style.display = 'none';
+  }
+}
+
+function openFilterPanel() {
+  const panel = document.getElementById('filter-panel');
+  const {minY, maxY} = getDashboardYearRange();
+
+  // Anos
+  const yearsEl = document.getElementById('filter-years');
+  if (yearsEl) {
+    let html = `<label style="display:flex;align-items:center;gap:7px;font-size:12.5px;cursor:pointer;color:var(--muted2)">
+      <input type="checkbox" id="fy-all" onchange="toggleAllYears(this.checked)"
+        style="width:14px;height:14px;accent-color:var(--accent2);cursor:pointer"
+        ${selectedYears.length===0?'checked':''}> Todos
+    </label>`;
+    for (let y=maxY; y>=minY; y--) {
+      html += `<label style="display:flex;align-items:center;gap:7px;font-size:12.5px;cursor:pointer">
+        <input type="checkbox" class="fy-cb" value="${y}" onchange="onYearCbChange()"
+          style="width:14px;height:14px;accent-color:var(--accent2);cursor:pointer"
+          ${selectedYears.includes(y)?'checked':''}> ${y}
+      </label>`;
+    }
+    yearsEl.innerHTML = html;
+  }
+
+  // Meses
+  const monthsEl = document.getElementById('filter-months');
+  if (monthsEl) {
+    let html = `<label style="display:flex;align-items:center;gap:7px;font-size:12.5px;cursor:pointer;color:var(--muted2);grid-column:1/-1">
+      <input type="checkbox" id="fm-all" onchange="toggleAllMonths(this.checked)"
+        style="width:14px;height:14px;accent-color:var(--accent2);cursor:pointer"
+        ${selectedMonths.length===0?'checked':''}> Todos
+    </label>`;
+    MESES_PT.forEach((m, i) => {
+      html += `<label style="display:flex;align-items:center;gap:7px;font-size:12.5px;cursor:pointer">
+        <input type="checkbox" class="fm-cb" value="${i}" onchange="onMonthCbChange()"
+          style="width:14px;height:14px;accent-color:var(--accent2);cursor:pointer"
+          ${selectedMonths.includes(i)?'checked':''}> ${m}
+      </label>`;
+    });
+    monthsEl.innerHTML = html;
+  }
+
+  panel.style.display = 'block';
+
+  // Fecha ao clicar fora
+  setTimeout(()=>{
+    document.addEventListener('click', closePanelOutside, {once:true});
+  }, 10);
+}
+
+function closePanelOutside(e) {
+  const panel = document.getElementById('filter-panel');
+  const btn = document.getElementById('btn-filter-period');
+  if (panel && !panel.contains(e.target) && btn && !btn.contains(e.target)) {
+    panel.style.display = 'none';
+  } else if (panel && panel.style.display !== 'none') {
+    document.addEventListener('click', closePanelOutside, {once:true});
+  }
+}
+
+function toggleAllYears(checked) {
+  document.querySelectorAll('.fy-cb').forEach(cb => cb.checked = false);
+  if (checked) selectedYears = [];
+}
+function toggleAllMonths(checked) {
+  document.querySelectorAll('.fm-cb').forEach(cb => cb.checked = false);
+  if (checked) selectedMonths = [];
+}
+function onYearCbChange() {
+  document.getElementById('fy-all').checked = false;
+}
+function onMonthCbChange() {
+  document.getElementById('fm-all').checked = false;
+}
+
+function selectAllPeriod() {
+  selectedYears = []; selectedMonths = [];
+  applyFilterPanel();
+}
+
+function applyFilterPanel() {
+  // Lê checkboxes de anos
+  const allYearsCb = document.getElementById('fy-all');
+  if (allYearsCb && allYearsCb.checked) {
+    selectedYears = [];
+  } else {
+    selectedYears = [...document.querySelectorAll('.fy-cb:checked')].map(cb=>parseInt(cb.value));
+    if (!selectedYears.length) selectedYears = [new Date().getFullYear()];
+  }
+
+  // Lê checkboxes de meses
+  const allMonthsCb = document.getElementById('fm-all');
+  if (allMonthsCb && allMonthsCb.checked) {
+    selectedMonths = [];
+  } else {
+    selectedMonths = [...document.querySelectorAll('.fm-cb:checked')].map(cb=>parseInt(cb.value));
+    if (!selectedMonths.length) selectedMonths = [new Date().getMonth()];
+  }
+
+  // Atualiza compatibilidade legada
+  dashboardMonth = selectedMonths.length === 1 ? selectedMonths[0] : -1;
+  dashboardYear  = selectedYears.length  === 1 ? selectedYears[0]  : 0;
+
+  // Atualiza label do botão
+  updateFilterLabel();
+  document.getElementById('filter-panel').style.display = 'none';
+  renderDashboard();
+}
+
+function updateFilterLabel() {
+  const el = document.getElementById('filter-period-label');
+  if (!el) return;
+  if (!selectedYears.length && !selectedMonths.length) { el.textContent = 'Todo o período'; return; }
+  if (!selectedYears.length) { el.textContent = selectedMonths.map(m=>MESES_PT[m]).join(', ') + ' (todos os anos)'; return; }
+  if (!selectedMonths.length) { el.textContent = selectedYears.join(', '); return; }
+  if (selectedMonths.length === 1 && selectedYears.length === 1) {
+    el.textContent = `${MESES_PT[selectedMonths[0]]}/${selectedYears[0]}`; return;
+  }
+  const mLabel = selectedMonths.length <= 3 ? selectedMonths.map(m=>MESES_PT[m]).join(', ') : `${selectedMonths.length} meses`;
+  const yLabel = selectedYears.length <= 2 ? selectedYears.join(', ') : `${selectedYears.length} anos`;
+  el.textContent = `${mLabel} · ${yLabel}`;
+}
+
+function resetDashboardMonth() {
+  const today = new Date();
+  selectedMonths = [today.getMonth()];
+  selectedYears  = [today.getFullYear()];
+  dashboardMonth = selectedMonths[0];
+  dashboardYear  = selectedYears[0];
+  updateFilterLabel();
+  renderDashboard();
+}
+
+// Compatibilidade com populateDashboardMonthSelect (não faz mais nada)
+function populateDashboardMonthSelect() { updateFilterLabel(); }
+function onDashboardMonthSelect() {}
+function onDashboardYearSelect() {}
+function changeDashboardMonth(delta) {}
+function getDashboardYearRange() {
+  if (!policies.length) return { minY: new Date().getFullYear()-1, maxY: new Date().getFullYear() };
+  const years = policies.map(p=>parseValidityStart(p)?.getFullYear()).filter(Boolean);
+  return { minY: Math.min(...years), maxY: Math.max(...years) };
+}
+  // Compatibilidade legada — dashboardMonth/Year definidos no bloco de filtros acima
 
 function getDashboardYearRange() {
   const allDates = [
@@ -2034,26 +2209,30 @@ function renderDashboard() {
   populateDashboardMonthSelect();
   const today = new Date(); today.setHours(0,0,0,0);
 
-  const allMonths = dashboardMonth === -1;
-  const allYears  = dashboardYear  === 0;
+  const allMonths = selectedMonths.length === 0;
+  const allYears  = selectedYears.length  === 0;
+
+  // Compatibilidade com código legado
+  const cm = selectedMonths.length === 1 ? selectedMonths[0] : -1;
+  const cy = selectedYears.length  === 1 ? selectedYears[0]  : 0;
 
   // Controla visibilidade do seletor de anos do gráfico mensal
   const yearSelEl = document.getElementById('chart-year-selectors');
   if (yearSelEl) yearSelEl.style.display = allMonths ? 'none' : 'flex';
 
-  // Filtra pelo mês/ano selecionado (suporta "Todos")
+  // Filtra pelo período selecionado (suporta múltiplos meses e anos)
   const policiesInSelectedMonth = policies.filter(p=>{
     const d = parseValidityStart(p);
     if (!d) return false;
-    const yearMatch  = allYears  || d.getFullYear()===dashboardYear;
-    const monthMatch = allMonths || d.getMonth()===dashboardMonth;
+    const yearMatch  = allYears  || selectedYears.includes(d.getFullYear());
+    const monthMatch = allMonths || selectedMonths.includes(d.getMonth());
     return yearMatch && monthMatch;
   });
   const expensesInSelectedMonth = expenses.filter(e=>{
     if (!e.date) return false;
     const [y,m] = e.date.split('-').map(Number);
-    const yearMatch  = allYears  || y===dashboardYear;
-    const monthMatch = allMonths || (m-1)===dashboardMonth;
+    const yearMatch  = allYears  || selectedYears.includes(y);
+    const monthMatch = allMonths || selectedMonths.includes(m-1);
     return yearMatch && monthMatch;
   });
 
@@ -2064,12 +2243,12 @@ function renderDashboard() {
   const netProfit       = paidEarnings - totalExp;
   const renewals        = policies.filter(p=>getStatus(p.validityEnd).label==='A Vencer').sort((a,b)=>getStatus(a.validityEnd).daysLeft-getStatus(b.validityEnd).daysLeft);
 
-  // Mês/ano selecionados (para rótulos)
-  const cm=dashboardMonth, cy=dashboardYear;
+  // Label do período para os cards
   const periodoLabel = allYears && allMonths ? 'Todo o período'
-    : allYears  ? MESES_PT[cm] + ' (todos os anos)'
-    : allMonths ? String(cy)
-    : `${MESES_PT[cm]}/${cy}`;
+    : allYears  ? (selectedMonths.length===1?MESES_PT[selectedMonths[0]]:selectedMonths.map(m=>MESES_PT[m]).join(', ')) + ' (todos os anos)'
+    : allMonths ? selectedYears.join(', ')
+    : selectedMonths.length===1 && selectedYears.length===1 ? `${MESES_PT[selectedMonths[0]]}/${selectedYears[0]}`
+    : document.getElementById('filter-period-label')?.textContent || 'Período selecionado';
 
   // KPIs
   document.getElementById('dash-kpis').innerHTML = `
@@ -2156,37 +2335,38 @@ function renderDashboard() {
     </div>
   `;
 
-  /* ═══ Cálculos de período (suporta "Todos os meses/anos") ═══ */
-  const pm = (cm===-1||cm===0)?11:cm-1, pmYear = (cm===0)?cy-1:cy;
-  const py = cy-1;
-  const isCurrentMonth = !allMonths && !allYears && cm===today.getMonth() && cy===today.getFullYear();
+  /* ═══ Cálculos de período ═══ */
+  // Para comparativos, usa o primeiro ano/mês selecionado como referência
+  const refY = selectedYears.length ? Math.max(...selectedYears) : new Date().getFullYear();
+  const refM = selectedMonths.length ? Math.max(...selectedMonths) : new Date().getMonth();
+  const pm = refM===0?11:refM-1, pmYear = refM===0?refY-1:refY;
+  const py = refY-1;
+  const isCurrentMonth = selectedMonths.length===1 && selectedYears.length===1 &&
+    selectedMonths[0]===today.getMonth() && selectedYears[0]===today.getFullYear();
 
   const policiesWithDate = policies.map(p=>({...p, _d: parseValidityStart(p)})).filter(p=>p._d);
 
-  // thisMonth = conjunto principal filtrado pelo período selecionado
   const thisMonth = policiesWithDate.filter(p=>{
-    const yearMatch  = allYears  || p._d.getFullYear()===cy;
-    const monthMatch = allMonths || p._d.getMonth()===cm;
+    const yearMatch  = allYears  || selectedYears.includes(p._d.getFullYear());
+    const monthMatch = allMonths || selectedMonths.includes(p._d.getMonth());
     return yearMatch && monthMatch;
   });
-  // comparativos só fazem sentido quando há filtro específico
-  const prevMonth = (!allMonths && !allYears)
+  const prevMonth = (selectedMonths.length===1 && selectedYears.length===1)
     ? policiesWithDate.filter(p=>p._d.getFullYear()===pmYear && p._d.getMonth()===pm)
     : [];
-  const sameMonthLastYear = (!allMonths && !allYears)
-    ? policiesWithDate.filter(p=>p._d.getFullYear()===py && p._d.getMonth()===cm)
+  const sameMonthLastYear = (selectedMonths.length===1 && selectedYears.length===1)
+    ? policiesWithDate.filter(p=>p._d.getFullYear()===py && p._d.getMonth()===refM)
     : [];
   const thisYearPolicies = allYears
     ? policiesWithDate
-    : policiesWithDate.filter(p=>p._d.getFullYear()===cy);
+    : policiesWithDate.filter(p=>selectedYears.includes(p._d.getFullYear()));
   const lastYearPolicies = policiesWithDate.filter(p=>p._d.getFullYear()===py);
 
-  const monthEnd = isCurrentMonth ? today : allMonths||allYears ? today : new Date(cy, cm+1, 0);
-  const wd = (allMonths||allYears) ? null : countWorkdays(new Date(cy,cm,1), monthEnd);
+  const monthEnd = isCurrentMonth ? today : (allMonths||allYears) ? today : new Date(refY, refM+1, 0);
+  const wd = (allMonths||allYears||selectedMonths.length>1||selectedYears.length>1) ? null : countWorkdays(new Date(refY,refM,1), monthEnd);
   const avg = wd ? (thisMonth.length/wd).toFixed(1) : '—';
   const monthEarnings = thisMonth.filter(p=>isPaid(p.commissionStatus)).reduce((a,c)=>a+(c.brokerEarning||0),0);
 
-  // Renderiza barras de progresso das metas
   renderGoals(thisMonth.length, monthEarnings);
 
   const pctChange = (curr, prev) => prev===0 ? (curr>0?100:0) : Math.round(((curr-prev)/prev)*100);
@@ -2197,31 +2377,31 @@ function renderDashboard() {
 
   /* ═══ KPIs extras ═══ */
   const arrowIcon = up => `<svg style="width:13px;height:13px;display:inline;vertical-align:-2px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="${up?'18 15 12 9 6 15':'6 9 12 15 18 9'}"/></svg>`;
-  const showComparativo = !allMonths && !allYears;
+  const showComparativo = selectedMonths.length===1 && selectedYears.length===1;
   const changeBadge = (pct) => showComparativo
     ? `<span style="font-size:12px;color:${pct>=0?'var(--green)':'var(--red)'};font-weight:600">${arrowIcon(pct>=0)} ${Math.abs(pct)}% vs ${MESES_PT[pm]}</span>`
     : `<span style="font-size:11px;color:var(--muted)">período completo</span>`;
 
   document.getElementById('dash-kpis-extra').innerHTML = `
     <div class="stat-card">
-      <div class="stat-label">Fechados ${allMonths&&allYears?'no total':allYears?'em '+MESES_PT[cm]:allMonths?'em '+cy:'em '+MESES_PT[cm]}</div>
+      <div class="stat-label">Fechados ${periodoLabel}</div>
       <div class="stat-value" style="font-size:22px">${thisMonth.length}</div>
       <div style="margin-top:6px">${changeBadge(momChange)}</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Média por dia útil</div>
       <div class="stat-value" style="font-size:22px">${avg}</div>
-      <div style="font-size:11px;color:var(--muted);margin-top:6px">${wd ? `${wd} dias úteis ${isCurrentMonth?'até hoje':'no mês'}` : 'período completo'}</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px">${wd ? `${wd} dias úteis ${isCurrentMonth?'até hoje':'no mês'}` : 'período selecionado'}</div>
     </div>
     <div class="stat-card">
-      <div class="stat-label">Comissão ${allMonths&&allYears?'total':allYears?'em '+MESES_PT[cm]:allMonths?'em '+cy:'de '+MESES_PT[cm]}</div>
+      <div class="stat-label">Comissão ${periodoLabel}</div>
       <div class="stat-value" style="font-size:20px;color:var(--green)">${fmt(monthEarnings)}</div>
       <div style="margin-top:6px">${changeBadge(momEarningsChange)}</div>
     </div>
     <div class="stat-card">
-      <div class="stat-label">${showComparativo ? `Vs. ${MESES_PT[cm]}/${py}` : `Vs. ${py}`}</div>
+      <div class="stat-label">${showComparativo ? `Vs. ${MESES_PT[refM]}/${py}` : `Vs. ${py}`}</div>
       <div class="stat-value" style="font-size:22px;color:${yoyChange>=0?'var(--green)':'var(--red)'}">${showComparativo||lastYearPolicies.length?`${yoyChange>=0?'+':''}${yoyChange}%`:'—'}</div>
-      <div style="font-size:11px;color:var(--muted);margin-top:6px">${showComparativo?`${MESES_PT[cm]}/${py}: ${sameMonthLastYear.length} seguros`:`${py}: ${lastYearPolicies.length} seguros`}</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px">${showComparativo?`${MESES_PT[refM]}/${py}: ${sameMonthLastYear.length} seguros`:`${py}: ${lastYearPolicies.length} seguros`}</div>
     </div>
   `;
 
@@ -2559,7 +2739,7 @@ function renderDashboard() {
     <!-- Seguro Ative: renovação automática -->
     <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--green);margin:10px 0 6px;display:flex;align-items:center;gap:5px">
       <svg style="width:11px;height:11px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
-      Seguro Ative — Renovação Automática (${ativeRenewals.length})
+      Ative Motos — Renovação Automática (${ativeRenewals.length})
     </div>
     ${ativeRenewals.map(p=>{
       const s=getStatus(p.validityEnd);
