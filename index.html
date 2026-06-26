@@ -745,9 +745,17 @@ tbody td { padding:13px 18px; font-size:13px; vertical-align:middle; }
 
       <!-- Comparativo mensal -->
       <div class="perf-card" style="margin-bottom:22px">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
-          <svg style="width:15px;height:15px;color:var(--accent2)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-          <span class="syne" id="chart-monthly-title" style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted2)">Seguros Fechados por Mês — Ano Atual vs Anterior</span>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:8px">
+            <svg style="width:15px;height:15px;color:var(--accent2)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+            <span class="syne" id="chart-monthly-title" style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted2)">Seguros Fechados por Mês — Ano Atual vs Anterior</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px" id="chart-year-selectors">
+            <span style="font-size:11px;color:var(--muted2)">Comparar:</span>
+            <select id="chart-year-a" onchange="renderDashboard()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:7px;font-size:12px;font-family:inherit;cursor:pointer"></select>
+            <span style="font-size:11px;color:var(--muted2)">vs</span>
+            <select id="chart-year-b" onchange="renderDashboard()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:7px;font-size:12px;font-family:inherit;cursor:pointer"></select>
+          </div>
         </div>
         <div style="position:relative;width:100%;height:240px">
           <canvas id="chart-monthly"></canvas>
@@ -1878,6 +1886,8 @@ function renderGoals(thisMonthCount, monthEarnings) {
 
 /* ── TAXA DE RENOVAÇÃO ── */
 function calcRenewalRate() {
+  const isAtive = ins => (ins||'').toLowerCase().includes('ative');
+
   // Agrupa apólices por cliente
   const groups = {};
   policies.forEach(p => {
@@ -1887,7 +1897,6 @@ function calcRenewalRate() {
     groups[key].push(p);
   });
 
-  // Clientes com apólices vencidas (fim de vigência no passado)
   const today = new Date(); today.setHours(0,0,0,0);
   let totalWithExpired = 0;
   let totalRenewed = 0;
@@ -1895,21 +1904,29 @@ function calcRenewalRate() {
   const notRenewedClients = [];
 
   Object.entries(groups).forEach(([key, clientPolicies]) => {
-    // Ordena por data de início
     const sorted = clientPolicies
       .filter(p=>p.validityStart && p.validityEnd)
       .sort((a,b)=>new Date(a.validityStart)-new Date(b.validityStart));
 
     if (sorted.length < 1) return;
 
-    // Verifica se tem alguma apólice vencida
     const hasExpired = sorted.some(p => new Date(p.validityEnd) < today);
     if (!hasExpired) return;
 
     totalWithExpired++;
 
-    // Verifica se renovou: data de início de uma apólice está até 45 dias
-    // após o fim de outra apólice do mesmo cliente
+    const latest = sorted[sorted.length-1];
+    const client = { name: clientPolicies[0].clientName, policies: sorted.length, insurer: latest.insurer, lastEnd: latest.validityEnd };
+
+    // Seguro Ative: renovação automática — qualquer apólice vencida já conta como renovado
+    const hasAtiveExpired = sorted.some(p => isAtive(p.insurer) && new Date(p.validityEnd) < today);
+    if (hasAtiveExpired) {
+      totalRenewed++;
+      renewedClients.push({...client, autoRenewed: true});
+      return;
+    }
+
+    // Outras seguradoras: verifica se renovou (nova apólice até 45 dias após fim da anterior)
     let renewed = false;
     for (let i=0; i<sorted.length-1; i++) {
       const endA = new Date(sorted[i].validityEnd);
@@ -1918,9 +1935,6 @@ function calcRenewalRate() {
       if (diff >= -15 && diff <= 45) { renewed = true; break; }
     }
 
-    const latest = sorted[sorted.length-1];
-    const client = { name: clientPolicies[0].clientName, policies: sorted.length, insurer: latest.insurer, lastEnd: latest.validityEnd };
-
     if (renewed) { totalRenewed++; renewedClients.push(client); }
     else { notRenewedClients.push(client); }
   });
@@ -1928,6 +1942,29 @@ function calcRenewalRate() {
   const rate = totalWithExpired > 0 ? Math.round((totalRenewed/totalWithExpired)*100) : 0;
   return { rate, totalRenewed, totalWithExpired, renewedClients, notRenewedClients };
 }
+
+/* ── Plugin de quantidade em cima das barras (reutilizável) ── */
+const datalabelsPlugin = {
+  id: 'datalabels',
+  afterDatasetsDraw(chart) {
+    const ctx2 = chart.ctx;
+    chart.data.datasets.forEach((dataset, i) => {
+      const meta = chart.getDatasetMeta(i);
+      if (meta.hidden) return;
+      meta.data.forEach((bar, j) => {
+        const val = dataset.data[j];
+        if (!val) return;
+        ctx2.save();
+        ctx2.fillStyle = 'rgba(200,200,220,.85)';
+        ctx2.font = 'bold 9.5px Inter, sans-serif';
+        ctx2.textAlign = 'center';
+        ctx2.textBaseline = 'bottom';
+        ctx2.fillText(val, bar.x, bar.y - 2);
+        ctx2.restore();
+      });
+    });
+  }
+};
 
 /* ── Filtro de mês/ano do Dashboard ── */
 let dashboardMonth = new Date().getMonth();
@@ -2217,6 +2254,7 @@ function renderDashboard() {
   if (ctxW) {
     _charts.weekday = new Chart(ctxW, {
       type:'bar',
+      plugins: [datalabelsPlugin],
       data:{
         labels: dayLabels,
         datasets:[{ data: dayData, backgroundColor: barColors, borderRadius:4 }]
@@ -2291,39 +2329,40 @@ function renderDashboard() {
   }
   /* ═══ Gráfico: comparativo mensal / anual ═══ */
   const monthlyTitleEl = document.getElementById('chart-monthly-title');
+
+  // Popular seletores de ano
+  const {minY: minYearChart, maxY: maxYearChart} = getDashboardYearRange();
+  const yearSelA = document.getElementById('chart-year-a');
+  const yearSelB = document.getElementById('chart-year-b');
+  const yearSelectors = document.getElementById('chart-year-selectors');
+
+  if (yearSelA && yearSelB) {
+    const yearsKey = `${minYearChart}-${maxYearChart}`;
+    if (yearSelA.dataset.range !== yearsKey) {
+      const opts = [];
+      for (let y=maxYearChart; y>=minYearChart; y--) opts.push(`<option value="${y}">${y}</option>`);
+      yearSelA.innerHTML = opts.join('');
+      yearSelB.innerHTML = opts.join('');
+      // Padrão: A = ano anterior, B = ano atual
+      yearSelA.value = String(maxYearChart - 1);
+      yearSelB.value = String(maxYearChart);
+      yearSelA.dataset.range = yearsKey;
+    }
+  }
+  // Esconde seletores no modo "Todos os meses" (já mostra todos os anos)
+  if (yearSelectors) yearSelectors.style.display = allMonths ? 'none' : 'flex';
+
+  const selectedYearA = yearSelA ? parseInt(yearSelA.value) : py;
+  const selectedYearB = yearSelB ? parseInt(yearSelB.value) : cy;
+
   destroyChart('monthly');
   const ctxM = document.getElementById('chart-monthly');
   if (ctxM) {
-    // Plugin inline para mostrar quantidade em cima de cada barra
-    const datalabelsPlugin = {
-      id: 'datalabels',
-      afterDatasetsDraw(chart) {
-        const ctx2 = chart.ctx;
-        chart.data.datasets.forEach((dataset, i) => {
-          const meta = chart.getDatasetMeta(i);
-          if (meta.hidden) return;
-          meta.data.forEach((bar, j) => {
-            const val = dataset.data[j];
-            if (!val) return;
-            ctx2.save();
-            ctx2.fillStyle = '#ccccdd';
-            ctx2.font = '10px Inter, sans-serif';
-            ctx2.textAlign = 'center';
-            ctx2.textBaseline = 'bottom';
-            ctx2.fillText(val, bar.x, bar.y - 2);
-            ctx2.restore();
-          });
-        });
-      }
-    };
-
     if (allMonths) {
-      // Modo "Todos os meses": compara totais por ano (2024, 2025, 2026...)
+      // Modo "Todos os meses": compara totais por ano (todos os anos disponíveis)
       const policiesAll = policies.map(p=>({...p, _d: parseValidityStart(p)})).filter(p=>p._d);
-      const {minY: minYear} = getDashboardYearRange();
-      const maxYear = new Date().getFullYear();
       const years = [];
-      for (let y=minYear; y<=maxYear; y++) years.push(y);
+      for (let y=minYearChart; y<=maxYearChart; y++) years.push(y);
       const colors = ['rgba(167,139,250,.5)','#6c63ff','#22d3a5','#f97316','#f43f5e'];
       const datasets = years.map((y,i)=>({
         label: String(y),
@@ -2344,19 +2383,18 @@ function renderDashboard() {
                    x:{ ticks:{color:'#9999aa'}, grid:{display:false} } } }
       });
     } else {
-      // Modo normal: mês a mês, ano atual vs anterior
-      const monthlyThisYear = Array(12).fill(0);
-      const monthlyLastYear = Array(12).fill(0);
-      thisYearPolicies.forEach(p=>{ monthlyThisYear[p._d.getMonth()]++; });
-      lastYearPolicies.forEach(p=>{ monthlyLastYear[p._d.getMonth()]++; });
-      if (monthlyTitleEl) monthlyTitleEl.textContent = `Seguros Fechados por Mês — ${allYears?'Todos os Anos':`${cy} vs ${py}`}`;
+      // Modo normal: compara os dois anos selecionados
+      const policiesAll = policies.map(p=>({...p, _d: parseValidityStart(p)})).filter(p=>p._d);
+      const dataA = MESES_PT.map((_,m)=> policiesAll.filter(p=>p._d.getFullYear()===selectedYearA && p._d.getMonth()===m).length);
+      const dataB = MESES_PT.map((_,m)=> policiesAll.filter(p=>p._d.getFullYear()===selectedYearB && p._d.getMonth()===m).length);
+      if (monthlyTitleEl) monthlyTitleEl.textContent = `Seguros Fechados por Mês — ${selectedYearA} vs ${selectedYearB}`;
       _charts.monthly = new Chart(ctxM, {
         type:'bar',
         plugins: [datalabelsPlugin],
         data:{ labels: MESES_PT,
           datasets:[
-            { label:String(py), data: monthlyLastYear, backgroundColor:'rgba(167,139,250,.35)', borderRadius:5 },
-            { label:allYears?'Todos':String(cy), data: monthlyThisYear, backgroundColor:'#6c63ff', borderRadius:5 }
+            { label:String(selectedYearA), data: dataA, backgroundColor:'rgba(167,139,250,.45)', borderRadius:5 },
+            { label:String(selectedYearB), data: dataB, backgroundColor:'#6c63ff', borderRadius:5 }
           ]},
         options:{ responsive:true, maintainAspectRatio:false,
           plugins:{ legend:{ display:true, position:'top', labels:{ color:'#9999aa', boxWidth:11, font:{size:11} } },
@@ -2389,6 +2427,7 @@ function renderDashboard() {
   if (ctxIM) {
     _charts.insurerMonth = new Chart(ctxIM, {
       type:'bar',
+      plugins: [datalabelsPlugin],
       data:{ labels: allInsurersMonth,
         datasets:[
           { label:allMonths?`${MESES_PT[cm]} (todos os anos)`:MESES_PT[pm], data: allInsurersMonth.map(i=>insPrevMonth[i]||0), backgroundColor:'rgba(34,211,165,.35)', borderRadius:5 },
@@ -2411,6 +2450,7 @@ function renderDashboard() {
   if (ctxIY) {
     _charts.insurerYear = new Chart(ctxIY, {
       type:'bar',
+      plugins: [datalabelsPlugin],
       data:{ labels: allInsurersYear,
         datasets:[
           { label:String(py), data: allInsurersYear.map(i=>insLastYear[i]||0), backgroundColor:'rgba(249,115,22,.35)', borderRadius:5 },
@@ -2796,7 +2836,10 @@ function renderClients() {
     const nameKey = g.name.toUpperCase();
     const isRenewed = renewedNames.has(nameKey);
     const isNotRenewed = notRenewedNames.has(nameKey);
-    const renewalBadge = isRenewed
+    const isAutoRenewed = isRenewed && renewal.renewedClients.find(c=>c.name.toUpperCase()===nameKey)?.autoRenewed;
+    const renewalBadge = isAutoRenewed
+      ? `<span style="font-size:9.5px;font-weight:700;color:#22d3a5;background:rgba(34,211,165,.12);padding:1px 7px;border-radius:99px;margin-left:6px">⟳ auto (Ative)</span>`
+      : isRenewed
       ? `<span style="font-size:9.5px;font-weight:700;color:var(--green);background:rgba(34,211,165,.12);padding:1px 7px;border-radius:99px;margin-left:6px">✓ renovou</span>`
       : isNotRenewed
       ? `<span style="font-size:9.5px;font-weight:700;color:var(--red);background:rgba(244,63,94,.1);padding:1px 7px;border-radius:99px;margin-left:6px">✗ não renovou</span>`
