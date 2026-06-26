@@ -1921,7 +1921,8 @@ function populateDashboardMonthSelect() {
   if (!monthSel || !yearSel) return;
 
   if (!monthSel.dataset.filled) {
-    monthSel.innerHTML = MESES_PT.map((nome,i)=>`<option value="${i}">${nome}</option>`).join('');
+    monthSel.innerHTML = `<option value="-1">Todos os meses</option>` +
+      MESES_PT.map((nome,i)=>`<option value="${i}">${nome}</option>`).join('');
     monthSel.dataset.filled = '1';
   }
   monthSel.value = dashboardMonth;
@@ -1929,7 +1930,7 @@ function populateDashboardMonthSelect() {
   const {minY, maxY} = getDashboardYearRange();
   const yearsKey = `${minY}-${maxY}`;
   if (yearSel.dataset.range !== yearsKey) {
-    const opts = [];
+    const opts = [`<option value="0">Todos os anos</option>`];
     for (let y=maxY; y>=minY; y--) opts.push(`<option value="${y}">${y}</option>`);
     yearSel.innerHTML = opts.join('');
     yearSel.dataset.range = yearsKey;
@@ -1946,6 +1947,8 @@ function onDashboardYearSelect() {
   renderDashboard();
 }
 function changeDashboardMonth(delta) {
+  // Setas só funcionam quando mês/ano específicos estão selecionados
+  if (dashboardMonth === -1 || dashboardYear === 0) return;
   dashboardMonth += delta;
   if (dashboardMonth > 11) { dashboardMonth = 0; dashboardYear++; }
   if (dashboardMonth < 0)  { dashboardMonth = 11; dashboardYear--; }
@@ -1962,26 +1965,38 @@ function renderDashboard() {
   populateDashboardMonthSelect();
   const today = new Date(); today.setHours(0,0,0,0);
 
-  // Filtra pelo mês/ano selecionado no topo (dashboardMonth/dashboardYear)
+  const allMonths = dashboardMonth === -1;
+  const allYears  = dashboardYear  === 0;
+
+  // Filtra pelo mês/ano selecionado (suporta "Todos")
   const policiesInSelectedMonth = policies.filter(p=>{
     const d = parseValidityStart(p);
-    return d && d.getFullYear()===dashboardYear && d.getMonth()===dashboardMonth;
+    if (!d) return false;
+    const yearMatch  = allYears  || d.getFullYear()===dashboardYear;
+    const monthMatch = allMonths || d.getMonth()===dashboardMonth;
+    return yearMatch && monthMatch;
   });
   const expensesInSelectedMonth = expenses.filter(e=>{
     if (!e.date) return false;
     const [y,m] = e.date.split('-').map(Number);
-    return y===dashboardYear && (m-1)===dashboardMonth;
+    const yearMatch  = allYears  || y===dashboardYear;
+    const monthMatch = allMonths || (m-1)===dashboardMonth;
+    return yearMatch && monthMatch;
   });
 
-  const activePolicies = policiesInSelectedMonth; // todas as apólices fechadas no mês selecionado
-  const paidEarnings   = policiesInSelectedMonth.filter(p=>isPaid(p.commissionStatus)).reduce((a,c)=>a+(c.brokerEarning||0),0);
-  const pendingEarnings= policiesInSelectedMonth.filter(p=>p.commissionStatus==='Pendente').reduce((a,c)=>a+(c.brokerEarning||0),0);
-  const totalExp       = expensesInSelectedMonth.reduce((a,c)=>a+c.amount,0);
-  const netProfit      = paidEarnings - totalExp;
-  const renewals       = policies.filter(p=>getStatus(p.validityEnd).label==='A Vencer').sort((a,b)=>getStatus(a.validityEnd).daysLeft-getStatus(b.validityEnd).daysLeft);
+  const activePolicies  = policiesInSelectedMonth;
+  const paidEarnings    = policiesInSelectedMonth.filter(p=>isPaid(p.commissionStatus)).reduce((a,c)=>a+(c.brokerEarning||0),0);
+  const pendingEarnings = policiesInSelectedMonth.filter(p=>p.commissionStatus==='Pendente').reduce((a,c)=>a+(c.brokerEarning||0),0);
+  const totalExp        = expensesInSelectedMonth.reduce((a,c)=>a+c.amount,0);
+  const netProfit       = paidEarnings - totalExp;
+  const renewals        = policies.filter(p=>getStatus(p.validityEnd).label==='A Vencer').sort((a,b)=>getStatus(a.validityEnd).daysLeft-getStatus(b.validityEnd).daysLeft);
 
-  // Mês/ano selecionados (usado nos KPIs e em todo o restante do dashboard)
+  // Mês/ano selecionados (para rótulos)
   const cm=dashboardMonth, cy=dashboardYear;
+  const periodoLabel = allYears && allMonths ? 'Todo o período'
+    : allYears  ? MESES_PT[cm] + ' (todos os anos)'
+    : allMonths ? String(cy)
+    : `${MESES_PT[cm]}/${cy}`;
 
   // KPIs
   document.getElementById('dash-kpis').innerHTML = `
@@ -1990,7 +2005,7 @@ function renderDashboard() {
         <div class="stat-icon" style="background:rgba(108,99,255,.15);color:var(--accent2)">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
         </div>
-        <span style="font-size:11px;color:var(--muted);font-weight:600">${MESES_PT[cm]}/${cy}</span>
+        <span style="font-size:11px;color:var(--muted);font-weight:600">${periodoLabel}</span>
       </div>
       <div><div class="stat-label">Apólices do Mês</div><div class="stat-value">${activePolicies.length}</div></div>
     </div>
@@ -2068,24 +2083,35 @@ function renderDashboard() {
     </div>
   `;
 
-  /* ═══ Cálculos de período (usa o mês/ano selecionado no filtro) ═══ */
-  const pm = cm===0?11:cm-1, pmYear = cm===0?cy-1:cy;
+  /* ═══ Cálculos de período (suporta "Todos os meses/anos") ═══ */
+  const pm = (cm===-1||cm===0)?11:cm-1, pmYear = (cm===0)?cy-1:cy;
   const py = cy-1;
-  const isCurrentMonth = (cm===today.getMonth() && cy===today.getFullYear());
+  const isCurrentMonth = !allMonths && !allYears && cm===today.getMonth() && cy===today.getFullYear();
 
   const policiesWithDate = policies.map(p=>({...p, _d: parseValidityStart(p)})).filter(p=>p._d);
 
-  const thisMonth = policiesWithDate.filter(p=>p._d.getFullYear()===cy && p._d.getMonth()===cm);
-  const prevMonth = policiesWithDate.filter(p=>p._d.getFullYear()===pmYear && p._d.getMonth()===pm);
-  const sameMonthLastYear = policiesWithDate.filter(p=>p._d.getFullYear()===py && p._d.getMonth()===cm);
-  const thisYearPolicies = policiesWithDate.filter(p=>p._d.getFullYear()===cy);
+  // thisMonth = conjunto principal filtrado pelo período selecionado
+  const thisMonth = policiesWithDate.filter(p=>{
+    const yearMatch  = allYears  || p._d.getFullYear()===cy;
+    const monthMatch = allMonths || p._d.getMonth()===cm;
+    return yearMatch && monthMatch;
+  });
+  // comparativos só fazem sentido quando há filtro específico
+  const prevMonth = (!allMonths && !allYears)
+    ? policiesWithDate.filter(p=>p._d.getFullYear()===pmYear && p._d.getMonth()===pm)
+    : [];
+  const sameMonthLastYear = (!allMonths && !allYears)
+    ? policiesWithDate.filter(p=>p._d.getFullYear()===py && p._d.getMonth()===cm)
+    : [];
+  const thisYearPolicies = allYears
+    ? policiesWithDate
+    : policiesWithDate.filter(p=>p._d.getFullYear()===cy);
   const lastYearPolicies = policiesWithDate.filter(p=>p._d.getFullYear()===py);
 
-  // Dias úteis: se for o mês atual, conta até hoje; se for mês passado/futuro, conta o mês inteiro
-  const monthEnd = isCurrentMonth ? today : new Date(cy, cm+1, 0);
-  const wd = countWorkdays(new Date(cy,cm,1), monthEnd);
-  const avg = (thisMonth.length/(wd||1)).toFixed(1);
-  const monthEarnings = thisMonth.reduce((a,c)=>a+(c.brokerEarning||0),0);
+  const monthEnd = isCurrentMonth ? today : allMonths||allYears ? today : new Date(cy, cm+1, 0);
+  const wd = (allMonths||allYears) ? null : countWorkdays(new Date(cy,cm,1), monthEnd);
+  const avg = wd ? (thisMonth.length/wd).toFixed(1) : '—';
+  const monthEarnings = thisMonth.filter(p=>isPaid(p.commissionStatus)).reduce((a,c)=>a+(c.brokerEarning||0),0);
 
   // Renderiza barras de progresso das metas
   renderGoals(thisMonth.length, monthEarnings);
@@ -2098,28 +2124,31 @@ function renderDashboard() {
 
   /* ═══ KPIs extras ═══ */
   const arrowIcon = up => `<svg style="width:13px;height:13px;display:inline;vertical-align:-2px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="${up?'18 15 12 9 6 15':'6 9 12 15 18 9'}"/></svg>`;
-  const changeBadge = (pct) => `<span style="font-size:12px;color:${pct>=0?'var(--green)':'var(--red)'};font-weight:600">${arrowIcon(pct>=0)} ${Math.abs(pct)}% vs ${MESES_PT[pm]}</span>`;
+  const showComparativo = !allMonths && !allYears;
+  const changeBadge = (pct) => showComparativo
+    ? `<span style="font-size:12px;color:${pct>=0?'var(--green)':'var(--red)'};font-weight:600">${arrowIcon(pct>=0)} ${Math.abs(pct)}% vs ${MESES_PT[pm]}</span>`
+    : `<span style="font-size:11px;color:var(--muted)">período completo</span>`;
 
   document.getElementById('dash-kpis-extra').innerHTML = `
     <div class="stat-card">
-      <div class="stat-label">Fechados em ${MESES_PT[cm]}</div>
+      <div class="stat-label">Fechados ${allMonths&&allYears?'no total':allYears?'em '+MESES_PT[cm]:allMonths?'em '+cy:'em '+MESES_PT[cm]}</div>
       <div class="stat-value" style="font-size:22px">${thisMonth.length}</div>
       <div style="margin-top:6px">${changeBadge(momChange)}</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Média por dia útil</div>
       <div class="stat-value" style="font-size:22px">${avg}</div>
-      <div style="font-size:11px;color:var(--muted);margin-top:6px">${wd} dias úteis ${isCurrentMonth?'até hoje':'no mês'}</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px">${wd ? `${wd} dias úteis ${isCurrentMonth?'até hoje':'no mês'}` : 'período completo'}</div>
     </div>
     <div class="stat-card">
-      <div class="stat-label">Comissão de ${MESES_PT[cm]}</div>
+      <div class="stat-label">Comissão ${allMonths&&allYears?'total':allYears?'em '+MESES_PT[cm]:allMonths?'em '+cy:'de '+MESES_PT[cm]}</div>
       <div class="stat-value" style="font-size:20px;color:var(--green)">${fmt(monthEarnings)}</div>
       <div style="margin-top:6px">${changeBadge(momEarningsChange)}</div>
     </div>
     <div class="stat-card">
-      <div class="stat-label">Vs. ${MESES_PT[cm]}/${py}</div>
-      <div class="stat-value" style="font-size:22px;color:${yoyChange>=0?'var(--green)':'var(--red)'}">${yoyChange>=0?'+':''}${yoyChange}%</div>
-      <div style="font-size:11px;color:var(--muted);margin-top:6px">${MESES_PT[cm]}/${py}: ${sameMonthLastYear.length} seguros</div>
+      <div class="stat-label">${showComparativo ? `Vs. ${MESES_PT[cm]}/${py}` : `Vs. ${py}`}</div>
+      <div class="stat-value" style="font-size:22px;color:${yoyChange>=0?'var(--green)':'var(--red)'}">${showComparativo||lastYearPolicies.length?`${yoyChange>=0?'+':''}${yoyChange}%`:'—'}</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px">${showComparativo?`${MESES_PT[cm]}/${py}: ${sameMonthLastYear.length} seguros`:`${py}: ${lastYearPolicies.length} seguros`}</div>
     </div>
   `;
 
@@ -2275,13 +2304,19 @@ function renderDashboard() {
       type:'bar',
       data:{ labels: allInsurersMonth,
         datasets:[
-          { label:MESES_PT[pm], data: allInsurersMonth.map(i=>insPrevMonth[i]||0), backgroundColor:'rgba(34,211,165,.35)', borderRadius:5 },
-          { label:MESES_PT[cm], data: allInsurersMonth.map(i=>insThisMonth[i]||0), backgroundColor:'#22d3a5', borderRadius:5 }
+          { label:allMonths?`${MESES_PT[cm]} (todos os anos)`:MESES_PT[pm], data: allInsurersMonth.map(i=>insPrevMonth[i]||0), backgroundColor:'rgba(34,211,165,.35)', borderRadius:5 },
+          { label:allMonths?`${MESES_PT[cm]} (todos os anos)`:MESES_PT[cm], data: allInsurersMonth.map(i=>insThisMonth[i]||0), backgroundColor:'#22d3a5', borderRadius:5 }
         ]},
       options:{ responsive:true, maintainAspectRatio:false,
-        plugins:{ legend:{ display:true, position:'top', labels:{ color:'#9999aa', boxWidth:11, font:{size:11} } } },
-        scales:{ y:{ beginAtZero:true, ticks:{precision:0, color:'#9999aa'}, grid:{color:'rgba(255,255,255,.06)'} },
-                 x:{ ticks:{color:'#9999aa', font:{size:10.5}}, grid:{display:false} } } }
+        plugins:{
+          legend:{ display:true, position:'top', labels:{ color:'#9999aa', boxWidth:11, font:{size:11} } },
+          tooltip:{ callbacks:{ label: ctx => `${ctx.dataset.label}: ${ctx.raw} seguros` } }
+        },
+        scales:{
+          y:{ beginAtZero:true, ticks:{precision:0, color:'#9999aa'}, grid:{color:'rgba(255,255,255,.06)'} },
+          x:{ ticks:{color:'#9999aa', font:{size:10.5}}, grid:{display:false} }
+        }
+      }
     });
   }
   destroyChart('insurerYear');
@@ -2292,12 +2327,18 @@ function renderDashboard() {
       data:{ labels: allInsurersYear,
         datasets:[
           { label:String(py), data: allInsurersYear.map(i=>insLastYear[i]||0), backgroundColor:'rgba(249,115,22,.35)', borderRadius:5 },
-          { label:String(cy), data: allInsurersYear.map(i=>insThisYear[i]||0), backgroundColor:'#f97316', borderRadius:5 }
+          { label:allYears?'Todos os anos':String(cy), data: allInsurersYear.map(i=>insThisYear[i]||0), backgroundColor:'#f97316', borderRadius:5 }
         ]},
       options:{ responsive:true, maintainAspectRatio:false,
-        plugins:{ legend:{ display:true, position:'top', labels:{ color:'#9999aa', boxWidth:11, font:{size:11} } } },
-        scales:{ y:{ beginAtZero:true, ticks:{precision:0, color:'#9999aa'}, grid:{color:'rgba(255,255,255,.06)'} },
-                 x:{ ticks:{color:'#9999aa', font:{size:10.5}}, grid:{display:false} } } }
+        plugins:{
+          legend:{ display:true, position:'top', labels:{ color:'#9999aa', boxWidth:11, font:{size:11} } },
+          tooltip:{ callbacks:{ label: ctx => `${ctx.dataset.label}: ${ctx.raw} seguros` } }
+        },
+        scales:{
+          y:{ beginAtZero:true, ticks:{precision:0, color:'#9999aa'}, grid:{color:'rgba(255,255,255,.06)'} },
+          x:{ ticks:{color:'#9999aa', font:{size:10.5}}, grid:{display:false} }
+        }
+      }
     });
   }
 
@@ -2306,7 +2347,7 @@ function renderDashboard() {
     return `<div class="insurer-row">
       <div class="insurer-row-header">
         <span class="insurer-name" title="${ins}">${ins}</span>
-        <span class="insurer-count">${cnt}</span>
+        <span class="insurer-count">${cnt} seguros (${pct}%)</span>
       </div>
       <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
     </div>`;
@@ -2382,7 +2423,8 @@ function sendRenewalReminder(policyId) {
   const phoneWithDDI = phone.startsWith('55') ? phone : `55${phone}`;
   const firstName = (p.clientName||'').trim().split(' ')[0];
   const dataFormatada = fmtDate(p.validityEnd);
-  const msg = `Olá, ${firstName}! Tudo bem? Aqui é o Gutierre, da Gutierres Seguros. 😊\n\nPassando para avisar que o seguro do seu ${p.vehicleModel||'veículo'} vence em *${dataFormatada}*. Quer que eu já prepare a renovação para você não ficar sem cobertura?\n\nQualquer dúvida, me chama por aqui!`;
+  const veiculo = [p.vehicleModel, p.vehiclePlate].filter(Boolean).join(', ') || 'veículo';
+  const msg = `Olá, ${firstName}.\nAqui é Gutierre Seguros, passando pra avisar que sua apólice do veículo ${veiculo}, irá vencer no dia ${dataFormatada}, deseja renovar?`;
   window.open(`https://wa.me/${phoneWithDDI}?text=${encodeURIComponent(msg)}`, '_blank');
 }
 
