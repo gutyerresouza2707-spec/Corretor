@@ -783,13 +783,14 @@ tbody td { padding:13px 18px; font-size:13px; vertical-align:middle; }
       <!-- Comparativo seguradoras -->
       <div class="grid-2-1" style="align-items:start;margin-bottom:22px">
         <div class="perf-card">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;flex-wrap:wrap">
             <div style="display:flex;align-items:center;gap:8px">
               <svg style="width:15px;height:15px;color:var(--accent2)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-              <span class="syne" id="dash-insurer-month-title" style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted2)">Seguradoras — Mês Atual vs Anterior</span>
+              <span class="syne" id="dash-insurer-month-title" style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted2)">Seguradoras — Comparativo Mensal</span>
             </div>
             <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap" id="insurer-month-filters"></div>
           </div>
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:12px" id="insurer-month-ins-filters"></div>
           <div style="position:relative;width:100%;height:230px">
             <canvas id="chart-insurer-month"></canvas>
           </div>
@@ -800,8 +801,15 @@ tbody td { padding:13px 18px; font-size:13px; vertical-align:middle; }
               <svg style="width:15px;height:15px;color:var(--accent2)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
               <span class="syne" id="insurer-year-title" style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted2)">Seguradoras — Ano Atual vs Anterior</span>
             </div>
+          <div class="perf-card">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+            <div style="display:flex;align-items:center;gap:8px">
+              <svg style="width:15px;height:15px;color:var(--accent2)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              <span class="syne" id="insurer-year-title" style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted2)">Seguradoras — Comparativo Anual</span>
+            </div>
             <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap" id="insurer-year-filters"></div>
           </div>
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:12px" id="insurer-year-ins-filters"></div>
           <div style="position:relative;width:100%;height:230px">
             <canvas id="chart-insurer-year"></canvas>
           </div>
@@ -2940,27 +2948,36 @@ function renderInsurerMonthChart() {
   const ctxIM = document.getElementById('chart-insurer-month');
   if (!ctxIM) return;
 
-  // Meses selecionados: valor "YYYY-MM"
   const checkedMonths = [...document.querySelectorAll('.im-month-cb:checked')].map(cb=>cb.value);
   if (!checkedMonths.length) return;
 
   const policiesAll = policies.map(p=>({...p, _d: parseValidityStart(p)})).filter(p=>p._d);
 
-  // Seguradoras presentes nos meses selecionados
+  // Todas as seguradoras presentes nos meses selecionados
   const allIns = new Set();
   policiesAll.filter(p=>{
     const key = `${p._d.getFullYear()}-${String(p._d.getMonth()).padStart(2,'0')}`;
     return checkedMonths.includes(key);
   }).forEach(p=>allIns.add((p.insurer||'').trim()));
+  const allInsList = [...allIns].sort();
 
-  const insurerList = [...allIns].sort((a,b)=>{
-    const ta = policiesAll.filter(p=>{ const k=`${p._d.getFullYear()}-${String(p._d.getMonth()).padStart(2,'0')}`; return checkedMonths.includes(k)&&p.insurer===a; }).length;
-    const tb = policiesAll.filter(p=>{ const k=`${p._d.getFullYear()}-${String(p._d.getMonth()).padStart(2,'0')}`; return checkedMonths.includes(k)&&p.insurer===b; }).length;
-    return tb-ta;
-  });
+  // Monta filtros de seguradora
+  const insFiltersEl = document.getElementById('insurer-month-ins-filters');
+  if (insFiltersEl && !insFiltersEl.dataset.built) {
+    insFiltersEl.innerHTML = allInsList.map(ins=>`
+      <label style="display:flex;align-items:center;gap:5px;font-size:11.5px;cursor:pointer;background:var(--surface2);padding:3px 9px;border-radius:7px;border:1px solid var(--border)">
+        <input type="checkbox" class="im-ins-cb" value="${ins}" onchange="renderInsurerMonthChart()"
+          style="width:12px;height:12px;accent-color:var(--accent2)" checked> ${ins}
+      </label>`).join('');
+    insFiltersEl.dataset.built = '1';
+  }
+
+  // Seguradoras selecionadas
+  const checkedIns = [...document.querySelectorAll('.im-ins-cb:checked')].map(cb=>cb.value);
+  const insurerList = allInsList.filter(i=>checkedIns.includes(i));
+  if (!insurerList.length) return;
 
   const colors = ['#22d3a5','rgba(34,211,165,.5)','#6c63ff','rgba(108,99,255,.5)','#f97316'];
-
   const datasets = checkedMonths.map((ym,i)=>{
     const [y,m] = ym.split('-').map(Number);
     return {
@@ -2973,19 +2990,13 @@ function renderInsurerMonthChart() {
 
   destroyChart('insurerMonth');
   _charts.insurerMonth = new Chart(ctxIM, {
-    type:'bar',
-    plugins: [datalabelsPlugin],
+    type:'bar', plugins:[datalabelsPlugin],
     data:{ labels: insurerList, datasets },
     options:{ responsive:true, maintainAspectRatio:false,
-      plugins:{
-        legend:{ display:true, position:'top', labels:{ color:'#9999aa', boxWidth:11, font:{size:11} } },
-        tooltip:{ callbacks:{ label: ctx=>`${ctx.dataset.label}: ${ctx.raw} seguros` } }
-      },
-      scales:{
-        y:{ beginAtZero:true, ticks:{precision:0, color:'#9999aa'}, grid:{color:'rgba(255,255,255,.06)'} },
-        x:{ ticks:{color:'#9999aa', font:{size:10.5}}, grid:{display:false} }
-      }
-    }
+      plugins:{ legend:{ display:true, position:'top', labels:{ color:'#9999aa', boxWidth:11, font:{size:11} } },
+        tooltip:{ callbacks:{ label: ctx=>`${ctx.dataset.label}: ${ctx.raw} seguros` } } },
+      scales:{ y:{ beginAtZero:true, ticks:{precision:0, color:'#9999aa'}, grid:{color:'rgba(255,255,255,.06)'} },
+               x:{ ticks:{color:'#9999aa', font:{size:10.5}}, grid:{display:false} } } }
   });
 }
 
@@ -2993,21 +3004,32 @@ function renderInsurerYearChart() {
   const ctxIY = document.getElementById('chart-insurer-year');
   if (!ctxIY) return;
 
-  // Anos selecionados nos checkboxes
   const checkedYears = [...document.querySelectorAll('.iy-year-cb:checked')].map(cb=>parseInt(cb.value));
   if (!checkedYears.length) return;
   checkedYears.sort((a,b)=>a-b);
 
   const policiesAll = policies.map(p=>({...p, _d: parseValidityStart(p)})).filter(p=>p._d);
 
-  // Seguradoras presentes nos anos selecionados
+  // Todas as seguradoras presentes nos anos selecionados
   const allIns = new Set();
   policiesAll.filter(p=>checkedYears.includes(p._d.getFullYear())).forEach(p=>allIns.add((p.insurer||'').trim()));
-  const insurerList = [...allIns].sort((a,b)=>{
-    const ta = policiesAll.filter(p=>checkedYears.includes(p._d.getFullYear())&&p.insurer===a).length;
-    const tb = policiesAll.filter(p=>checkedYears.includes(p._d.getFullYear())&&p.insurer===b).length;
-    return tb-ta;
-  });
+  const allInsList = [...allIns].sort();
+
+  // Monta filtros de seguradora
+  const insFiltersEl = document.getElementById('insurer-year-ins-filters');
+  if (insFiltersEl && !insFiltersEl.dataset.built) {
+    insFiltersEl.innerHTML = allInsList.map(ins=>`
+      <label style="display:flex;align-items:center;gap:5px;font-size:11.5px;cursor:pointer;background:var(--surface2);padding:3px 9px;border-radius:7px;border:1px solid var(--border)">
+        <input type="checkbox" class="iy-ins-cb" value="${ins}" onchange="renderInsurerYearChart()"
+          style="width:12px;height:12px;accent-color:var(--accent2)" checked> ${ins}
+      </label>`).join('');
+    insFiltersEl.dataset.built = '1';
+  }
+
+  // Seguradoras selecionadas
+  const checkedIns = [...document.querySelectorAll('.iy-ins-cb:checked')].map(cb=>cb.value);
+  const insurerList = allInsList.filter(i=>checkedIns.includes(i));
+  if (!insurerList.length) return;
 
   const colors = ['#f97316','#6c63ff','#22d3a5','#f43f5e','#facc15'];
   const datasets = checkedYears.map((y,i)=>({
@@ -3019,19 +3041,13 @@ function renderInsurerYearChart() {
 
   destroyChart('insurerYear');
   _charts.insurerYear = new Chart(ctxIY, {
-    type:'bar',
-    plugins: [datalabelsPlugin],
+    type:'bar', plugins:[datalabelsPlugin],
     data:{ labels: insurerList, datasets },
     options:{ responsive:true, maintainAspectRatio:false,
-      plugins:{
-        legend:{ display:true, position:'top', labels:{ color:'#9999aa', boxWidth:11, font:{size:11} } },
-        tooltip:{ callbacks:{ label: ctx=>`${ctx.dataset.label}: ${ctx.raw} seguros` } }
-      },
-      scales:{
-        y:{ beginAtZero:true, ticks:{precision:0, color:'#9999aa'}, grid:{color:'rgba(255,255,255,.06)'} },
-        x:{ ticks:{color:'#9999aa', font:{size:10.5}}, grid:{display:false} }
-      }
-    }
+      plugins:{ legend:{ display:true, position:'top', labels:{ color:'#9999aa', boxWidth:11, font:{size:11} } },
+        tooltip:{ callbacks:{ label: ctx=>`${ctx.dataset.label}: ${ctx.raw} seguros` } } },
+      scales:{ y:{ beginAtZero:true, ticks:{precision:0, color:'#9999aa'}, grid:{color:'rgba(255,255,255,.06)'} },
+               x:{ ticks:{color:'#9999aa', font:{size:10.5}}, grid:{display:false} } } }
   });
 }
 
