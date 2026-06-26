@@ -792,9 +792,12 @@ tbody td { padding:13px 18px; font-size:13px; vertical-align:middle; }
           </div>
         </div>
         <div class="perf-card">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
-            <svg style="width:15px;height:15px;color:var(--accent2)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-            <span class="syne" style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted2)">Seguradoras — Ano Atual vs Anterior</span>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+            <div style="display:flex;align-items:center;gap:8px">
+              <svg style="width:15px;height:15px;color:var(--accent2)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              <span class="syne" id="insurer-year-title" style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted2)">Seguradoras — Ano Atual vs Anterior</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap" id="insurer-year-filters"></div>
           </div>
           <div style="position:relative;width:100%;height:230px">
             <canvas id="chart-insurer-year"></canvas>
@@ -2631,26 +2634,26 @@ function renderDashboard() {
   destroyChart('insurerYear');
   const ctxIY = document.getElementById('chart-insurer-year');
   if (ctxIY) {
-    _charts.insurerYear = new Chart(ctxIY, {
-      type:'bar',
-      plugins: [datalabelsPlugin],
-      data:{ labels: allInsurersYear,
-        datasets:[
-          { label:String(py), data: allInsurersYear.map(i=>insLastYear[i]||0), backgroundColor:'rgba(249,115,22,.35)', borderRadius:5 },
-          { label:allYears?'Todos os anos':String(cy), data: allInsurersYear.map(i=>insThisYear[i]||0), backgroundColor:'#f97316', borderRadius:5 }
-        ]},
-      options:{ responsive:true, maintainAspectRatio:false,
-        plugins:{
-          legend:{ display:true, position:'top', labels:{ color:'#9999aa', boxWidth:11, font:{size:11} } },
-          tooltip:{ callbacks:{ label: ctx => `${ctx.dataset.label}: ${ctx.raw} seguros` } }
-        },
-        scales:{
-          y:{ beginAtZero:true, ticks:{precision:0, color:'#9999aa'}, grid:{color:'rgba(255,255,255,.06)'} },
-          x:{ ticks:{color:'#9999aa', font:{size:10.5}}, grid:{display:false} }
-        }
+    // Monta filtros de ano para esse gráfico
+    const {minY: minYI, maxY: maxYI} = getDashboardYearRange();
+    const filtersEl = document.getElementById('insurer-year-filters');
+    if (filtersEl && !filtersEl.dataset.built) {
+      let html = '';
+      for (let y=maxYI; y>=minYI; y--) {
+        const checked = y >= maxYI-1; // padrão: últimos 2 anos
+        const color = y===maxYI?'#f97316':y===maxYI-1?'rgba(249,115,22,.5)':y===maxYI-2?'#6c63ff':'rgba(108,99,255,.5)';
+        html += `<label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;background:var(--surface2);padding:4px 10px;border-radius:7px;border:1px solid var(--border)">
+          <input type="checkbox" class="iy-year-cb" value="${y}" onchange="renderInsurerYearChart()"
+            style="width:12px;height:12px;accent-color:${color}" ${checked?'checked':''}> ${y}
+        </label>`;
       }
-    });
+      filtersEl.innerHTML = html;
+      filtersEl.dataset.built = '1';
+    }
+    renderInsurerYearChart();
   }
+  const titleEl2 = document.getElementById('insurer-year-title');
+  if (titleEl2) titleEl2.textContent = 'Seguradoras — Comparativo Anual';
 
   const insurerRows = Object.entries(insThisMonth).sort((a,b)=>b[1]-a[1]).map(([ins,cnt])=>{
     const pct=(cnt/(thisMonth.length||1)*100).toFixed(0);
@@ -2927,6 +2930,52 @@ function renderList() {
       </td>
     </tr>`;
   }).join('');
+}
+
+function renderInsurerYearChart() {
+  const ctxIY = document.getElementById('chart-insurer-year');
+  if (!ctxIY) return;
+
+  // Anos selecionados nos checkboxes
+  const checkedYears = [...document.querySelectorAll('.iy-year-cb:checked')].map(cb=>parseInt(cb.value));
+  if (!checkedYears.length) return;
+  checkedYears.sort((a,b)=>a-b);
+
+  const policiesAll = policies.map(p=>({...p, _d: parseValidityStart(p)})).filter(p=>p._d);
+
+  // Seguradoras presentes nos anos selecionados
+  const allIns = new Set();
+  policiesAll.filter(p=>checkedYears.includes(p._d.getFullYear())).forEach(p=>allIns.add((p.insurer||'').trim()));
+  const insurerList = [...allIns].sort((a,b)=>{
+    const ta = policiesAll.filter(p=>checkedYears.includes(p._d.getFullYear())&&p.insurer===a).length;
+    const tb = policiesAll.filter(p=>checkedYears.includes(p._d.getFullYear())&&p.insurer===b).length;
+    return tb-ta;
+  });
+
+  const colors = ['#f97316','#6c63ff','#22d3a5','#f43f5e','#facc15'];
+  const datasets = checkedYears.map((y,i)=>({
+    label: String(y),
+    data: insurerList.map(ins=>policiesAll.filter(p=>p._d.getFullYear()===y && (p.insurer||'').trim()===ins).length),
+    backgroundColor: colors[i%colors.length],
+    borderRadius: 5
+  }));
+
+  destroyChart('insurerYear');
+  _charts.insurerYear = new Chart(ctxIY, {
+    type:'bar',
+    plugins: [datalabelsPlugin],
+    data:{ labels: insurerList, datasets },
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{ display:true, position:'top', labels:{ color:'#9999aa', boxWidth:11, font:{size:11} } },
+        tooltip:{ callbacks:{ label: ctx=>`${ctx.dataset.label}: ${ctx.raw} seguros` } }
+      },
+      scales:{
+        y:{ beginAtZero:true, ticks:{precision:0, color:'#9999aa'}, grid:{color:'rgba(255,255,255,.06)'} },
+        x:{ ticks:{color:'#9999aa', font:{size:10.5}}, grid:{display:false} }
+      }
+    }
+  });
 }
 
 /* ── CLIENTS ── */
