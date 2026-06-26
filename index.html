@@ -1040,6 +1040,35 @@ tbody td { padding:13px 18px; font-size:13px; vertical-align:middle; }
       </div>
     </section>
 
+    <!-- ── REFUSE TICKET MODAL ── -->
+    <div id="refuse-ticket-overlay" style="display:none;position:fixed;inset:0;z-index:260;align-items:center;justify-content:center;background:rgba(0,0,0,.6);padding:20px">
+      <div style="width:100%;max-width:420px;background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:26px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+          <div class="syne" style="font-size:16px;font-weight:700;color:var(--red)">⚠️ Cliente não quer renovar</div>
+          <button onclick="closeRefuseTicket()" style="background:none;border:none;color:var(--muted);cursor:pointer;padding:4px">
+            <svg style="width:18px;height:18px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div id="refuse-client-info" style="background:var(--surface2);border-radius:10px;padding:12px;margin-bottom:16px;font-size:13px;color:var(--muted2)"></div>
+        <div style="margin-bottom:14px">
+          <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted2);display:block;margin-bottom:6px">Motivo da recusa</label>
+          <textarea id="refuse-reason" placeholder="Ex: Cliente saiu do estado, vendeu o veículo, sem dinheiro no momento..." rows="3"
+            style="width:100%;padding:10px 12px;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;color:var(--text);font-family:inherit;font-size:13px;resize:vertical;box-sizing:border-box"></textarea>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <button onclick="refuseRenewal('cancel')" style="background:rgba(244,63,94,.12);border:1px solid rgba(244,63,94,.3);color:var(--red);cursor:pointer;font-size:13px;font-weight:600;padding:10px;border-radius:10px;font-family:inherit;text-align:left">
+            🚫 Marcar apólice como Cancelada e arquivar
+          </button>
+          <button onclick="refuseRenewal('note')" style="background:rgba(249,115,22,.08);border:1px solid rgba(249,115,22,.2);color:var(--orange);cursor:pointer;font-size:13px;font-weight:600;padding:10px;border-radius:10px;font-family:inherit;text-align:left">
+            📋 Registrar observação (manter apólice como está)
+          </button>
+          <button onclick="refuseRenewal('both')" style="background:rgba(108,99,255,.1);border:1px solid rgba(108,99,255,.25);color:var(--accent2);cursor:pointer;font-size:13px;font-weight:600;padding:10px;border-radius:10px;font-family:inherit;text-align:left">
+            ✅ Fazer tudo: cancelar + registrar observação
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- ── CLIENT DETAIL MODAL ── -->
     <div id="client-detail-overlay" style="display:none;position:fixed;inset:0;z-index:250;align-items:center;justify-content:center;background:rgba(0,0,0,.55);padding:20px">
       <div style="width:100%;max-width:600px;max-height:85vh;overflow-y:auto;background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:26px">
@@ -2392,28 +2421,147 @@ function renderDashboard() {
     rList.innerHTML = `<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg><span>Nenhuma renovação próxima</span></div>`;
     return;
   }
-  rList.innerHTML = renewals.map(p => {
-    const s=getStatus(p.validityEnd);
-    const dLabel = s.daysLeft===0?'vence hoje':`${s.daysLeft}d`;
-    return `<div class="renewal-item" style="cursor:default">
-      <div class="renewal-dot"></div>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.clientName}</div>
-        <div style="font-size:11px;color:var(--muted);margin-top:1px">${p.vehicleModel||''}</div>
-      </div>
-      <div style="text-align:right;flex-shrink:0;display:flex;align-items:center;gap:8px">
-        <div>
-          <div style="font-size:11px;font-weight:700;color:var(--orange)">${fmtDate(p.validityEnd)}</div>
-          <div style="font-size:10px;color:var(--muted);margin-top:2px">${dLabel}</div>
+
+  // Separa Seguro Ative (automático) das demais
+  const ativeRenewals = renewals.filter(p=>(p.insurer||'').toLowerCase().includes('ative'));
+  const otherRenewals = renewals.filter(p=>!(p.insurer||'').toLowerCase().includes('ative'));
+
+  // Dashboard de renovações por seguradora
+  const byInsurerRenewal = {};
+  renewals.forEach(p=>{ const i=p.insurer||'Não informado'; byInsurerRenewal[i]=(byInsurerRenewal[i]||0)+1; });
+  const renewalByInsurerHTML = Object.entries(byInsurerRenewal).sort((a,b)=>b[1]-a[1]).map(([ins,cnt])=>`
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:5px 10px;background:rgba(255,255,255,.03);border-radius:7px">
+      <span style="font-size:11.5px;color:var(--muted2)">${ins}</span>
+      <span style="font-size:12px;font-weight:700;color:var(--orange)">${cnt}</span>
+    </div>`).join('');
+
+  const whatsBtn = (p) => p.clientContact ? `<button onclick="sendRenewalReminder('${p.id}')" title="Enviar lembrete por WhatsApp"
+    style="background:rgba(34,211,165,.12);border:none;color:var(--green);cursor:pointer;width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0"
+    onmouseenter="this.style.background='rgba(34,211,165,.22)'" onmouseleave="this.style.background='rgba(34,211,165,.12)'">
+    <svg style="width:14px;height:14px" viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.44.79 3.07 1.2 4.74 1.2 5.46 0 9.91-4.45 9.91-9.91C21.95 6.45 17.5 2 12.04 2zm5.8 14.07c-.24.68-1.42 1.3-1.96 1.38-.5.08-1.13.11-1.83-.12-.42-.13-.96-.31-1.65-.6-2.9-1.25-4.79-4.17-4.94-4.36-.14-.2-1.18-1.57-1.18-3 0-1.42.75-2.12 1.01-2.41.27-.29.58-.36.78-.36.19 0 .39 0 .56.01.18.01.42-.07.65.5.24.58.82 2 .89 2.15.07.15.12.32.02.52-.1.2-.15.32-.3.49-.15.17-.31.39-.45.52-.15.15-.3.31-.13.6.17.3.77 1.27 1.65 2.06 1.13 1.01 2.09 1.32 2.38 1.47.29.15.46.13.63-.08.17-.2.71-.83.9-1.12.19-.29.38-.24.64-.14.26.1 1.65.78 1.94.92.28.14.47.21.54.32.07.12.07.68-.17 1.36z"/></svg>
+  </button>` : '';
+
+  const refuseBtn = (p) => `<button onclick="openRefuseTicket('${p.id}')" title="Cliente não quer renovar"
+    style="background:rgba(244,63,94,.1);border:none;color:var(--red);cursor:pointer;width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0"
+    onmouseenter="this.style.background='rgba(244,63,94,.2)'" onmouseleave="this.style.background='rgba(244,63,94,.1)'" >
+    <svg style="width:13px;height:13px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+  </button>`;
+
+  rList.innerHTML = `
+    <!-- Dashboard por seguradora -->
+    <div style="background:rgba(255,255,255,.025);border-radius:10px;padding:10px 12px;margin-bottom:10px">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted2);margin-bottom:8px">Por seguradora</div>
+      <div style="display:flex;flex-direction:column;gap:5px">${renewalByInsurerHTML}</div>
+    </div>
+
+    ${ativeRenewals.length ? `
+    <!-- Seguro Ative: renovação automática -->
+    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--green);margin:10px 0 6px;display:flex;align-items:center;gap:5px">
+      <svg style="width:11px;height:11px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+      Seguro Ative — Renovação Automática (${ativeRenewals.length})
+    </div>
+    ${ativeRenewals.map(p=>{
+      const s=getStatus(p.validityEnd);
+      const dLabel = s.daysLeft===0?'vence hoje':`${s.daysLeft}d`;
+      return `<div class="renewal-item" style="border-color:rgba(34,211,165,.2);cursor:default">
+        <div style="width:8px;height:8px;border-radius:50%;background:var(--green);flex-shrink:0"></div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.clientName}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:1px">${p.vehicleModel||''}</div>
         </div>
-        ${p.clientContact ? `<button onclick="sendRenewalReminder('${p.id}')" title="Enviar lembrete por WhatsApp"
-          style="background:rgba(34,211,165,.12);border:none;color:var(--green);cursor:pointer;width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .14s"
-          onmouseenter="this.style.background='rgba(34,211,165,.22)'" onmouseleave="this.style.background='rgba(34,211,165,.12)'">
-          <svg style="width:14px;height:14px" viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.44.79 3.07 1.2 4.74 1.2 5.46 0 9.91-4.45 9.91-9.91C21.95 6.45 17.5 2 12.04 2zm5.8 14.07c-.24.68-1.42 1.3-1.96 1.38-.5.08-1.13.11-1.83-.12-.42-.13-.96-.31-1.65-.6-2.9-1.25-4.79-4.17-4.94-4.36-.14-.2-1.18-1.57-1.18-3 0-1.42.75-2.12 1.01-2.41.27-.29.58-.36.78-.36.19 0 .39 0 .56.01.18.01.42-.07.65.5.24.58.82 2 .89 2.15.07.15.12.32.02.52-.1.2-.15.32-.3.49-.15.17-.31.39-.45.52-.15.15-.3.31-.13.6.17.3.77 1.27 1.65 2.06 1.13 1.01 2.09 1.32 2.38 1.47.29.15.46.13.63-.08.17-.2.71-.83.9-1.12.19-.29.38-.24.64-.14.26.1 1.65.78 1.94.92.28.14.47.21.54.32.07.12.07.68-.17 1.36z"/></svg>
-        </button>` : ''}
-      </div>
-    </div>`;
-  }).join('');
+        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+          <div style="text-align:right">
+            <div style="font-size:11px;font-weight:700;color:var(--green)">${fmtDate(p.validityEnd)}</div>
+            <div style="font-size:10px;color:var(--muted);margin-top:2px">${dLabel}</div>
+          </div>
+          ${whatsBtn(p)}
+        </div>
+      </div>`;
+    }).join('')}` : ''}
+
+    ${otherRenewals.length ? `
+    <!-- Outras seguradoras: requer ação -->
+    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--orange);margin:10px 0 6px;display:flex;align-items:center;gap:5px">
+      <svg style="width:11px;height:11px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      Requer confirmação do cliente (${otherRenewals.length})
+    </div>
+    ${otherRenewals.map(p=>{
+      const s=getStatus(p.validityEnd);
+      const dLabel = s.daysLeft===0?'vence hoje':`${s.daysLeft}d`;
+      return `<div class="renewal-item" style="cursor:default">
+        <div class="renewal-dot"></div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.clientName}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:1px">${p.vehicleModel||''} · ${p.insurer||''}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+          <div style="text-align:right">
+            <div style="font-size:11px;font-weight:700;color:var(--orange)">${fmtDate(p.validityEnd)}</div>
+            <div style="font-size:10px;color:var(--muted);margin-top:2px">${dLabel}</div>
+          </div>
+          ${whatsBtn(p)}
+          ${refuseBtn(p)}
+        </div>
+      </div>`;
+    }).join('')}` : ''}
+  `;
+}
+
+/* ── TICKET DE RECUSA DE RENOVAÇÃO ── */
+let _refusePolicyId = null;
+
+function openRefuseTicket(policyId) {
+  const p = policies.find(x=>x.id===policyId);
+  if (!p) return;
+  _refusePolicyId = policyId;
+  document.getElementById('refuse-reason').value = '';
+  document.getElementById('refuse-client-info').innerHTML = `
+    <div style="font-weight:600;margin-bottom:4px">${p.clientName}</div>
+    <div>${p.insurer||''} · ${p.vehicleModel||''} · vence ${fmtDate(p.validityEnd)}</div>
+  `;
+  document.getElementById('refuse-ticket-overlay').style.display = 'flex';
+}
+
+function closeRefuseTicket() {
+  document.getElementById('refuse-ticket-overlay').style.display = 'none';
+  _refusePolicyId = null;
+}
+
+async function refuseRenewal(action) {
+  const p = policies.find(x=>x.id===_refusePolicyId);
+  if (!p) return;
+  const reason = document.getElementById('refuse-reason').value.trim();
+
+  const doCancel = action === 'cancel' || action === 'both';
+  const doNote   = action === 'note'   || action === 'both';
+
+  if (doCancel) {
+    // Marca como Cancelado no banco
+    if (window._sb && window._sbUser) {
+      await window._sb.client.from('policies')
+        .update({ commission_status: 'Cancelado' })
+        .eq('id', p.id);
+    }
+    const pol = policies.find(x=>x.id===p.id);
+    if (pol) pol.commissionStatus = 'Cancelado';
+  }
+
+  if (doNote && window._sb && window._sbUser) {
+    const noteText = `[RECUSOU RENOVAÇÃO ${new Date().toLocaleDateString('pt-BR')}]${reason ? ': '+reason : ''}`;
+    await window._sb.client.from('client_notes').insert({
+      client_name: p.clientName,
+      note: noteText,
+      user_id: window._sbUser.id,
+      created_at: Date.now(),
+      updated_at: Date.now()
+    });
+  }
+
+  closeRefuseTicket();
+  render();
+  showNotif(doCancel && doNote ? 'Apólice cancelada e observação registrada!'
+    : doCancel ? 'Apólice marcada como cancelada.'
+    : 'Observação registrada.');
 }
 
 function sendRenewalReminder(policyId) {
