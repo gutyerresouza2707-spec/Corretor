@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- CorretorPro v2.1 — build 03/07/2026
+<!-- CorretorPro v2.2 — build 03/07/2026
      Novidades: auto-recebimento de comissões (1º dia útil),
      dias úteis com feriados BR/BA/Jequié e sábado = ½,
      comparativo de média útil e dashboard renovado. -->
@@ -7,7 +7,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<meta name="app-version" content="2.1"/>
+<meta name="app-version" content="2.2"/>
 <title>CorretorPro — Gestor de Negócios</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
@@ -654,7 +654,7 @@ tbody td { padding:13px 18px; font-size:13px; vertical-align:middle; }
           <svg style="width:14px;height:14px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
         </button>
       </div>
-      <div style="text-align:center;font-size:9px;color:var(--muted);margin-top:8px;letter-spacing:.08em">v2.1 · dias úteis + auto-recebimento</div>
+      <div style="text-align:center;font-size:9px;color:var(--muted);margin-top:8px;letter-spacing:.08em">v2.2 · renovação 12m + dias úteis</div>
     </div>
   </aside>
 
@@ -2016,11 +2016,23 @@ function renderGoals(thisMonthCount, monthEarnings) {
 }
 
 /* ── TAXA DE RENOVAÇÃO ── */
-function calcRenewalRate() {
+function calcRenewalRate(windowMonths = 12) {
+  /* Mede a retenção RECENTE da carteira:
+     — Elegível: cliente com apólice vencida nos últimos {windowMonths} meses
+       cuja janela de decisão (45 dias) já fechou.
+     — Renovado: nova apólice iniciando entre -15 e +45 dias do vencimento,
+       ou seguradora "Ative" (renovação automática).
+     — Vencimentos há menos de 45 dias ficam como "em prazo" (não penalizam).
+     — Também calcula a janela anterior para tendência.                    */
   const isAtive = ins => {
     const s = (ins||'').toLowerCase();
     return s.includes('ativ'); // captura Ativo, Ative, Seguro Ativo, Seguro Ative
   };
+  const GRACE = 45;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const decisionCutoff = new Date(today); decisionCutoff.setDate(decisionCutoff.getDate() - GRACE);
+  const windowStart = new Date(today); windowStart.setMonth(windowStart.getMonth() - windowMonths);
+  const prevWindowStart = new Date(windowStart); prevWindowStart.setMonth(prevWindowStart.getMonth() - windowMonths);
 
   // Agrupa apólices por cliente
   const groups = {};
@@ -2031,50 +2043,74 @@ function calcRenewalRate() {
     groups[key].push(p);
   });
 
-  const today = new Date(); today.setHours(0,0,0,0);
-  let totalWithExpired = 0;
-  let totalRenewed = 0;
-  const renewedClients = [];
-  const notRenewedClients = [];
+  const clientRenewedAfter = (sorted, refEnd, refPolicy) => {
+    if (isAtive(refPolicy.insurer)) return { renewed:true, auto:true };
+    const renewed = sorted.some(p => {
+      if (!p.validityStart) return false;
+      const diff = (new Date(p.validityStart) - refEnd) / 86400000;
+      return diff >= -15 && diff <= GRACE;
+    });
+    return { renewed, auto:false };
+  };
 
-  Object.entries(groups).forEach(([key, clientPolicies]) => {
-    const sorted = clientPolicies
-      .filter(p=>p.validityStart && p.validityEnd)
-      .sort((a,b)=>new Date(a.validityStart)-new Date(b.validityStart));
+  const evalWindow = (wStart, wEnd, collectLists) => {
+    let eligible = 0, renewedCount = 0;
+    const renewedClients = [], notRenewedClients = [];
+    Object.values(groups).forEach(clientPolicies => {
+      const sorted = clientPolicies
+        .filter(p=>p.validityStart && p.validityEnd)
+        .sort((a,b)=>new Date(a.validityStart)-new Date(b.validityStart));
+      if (!sorted.length) return;
 
-    if (sorted.length < 1) return;
+      // Vencimentos dentro da janela (decisão já fechada)
+      const exps = sorted.filter(p => {
+        const end = new Date(p.validityEnd); end.setHours(0,0,0,0);
+        return end >= wStart && end <= wEnd;
+      });
+      if (!exps.length) return;
 
-    const hasExpired = sorted.some(p => new Date(p.validityEnd) < today);
-    if (!hasExpired) return;
+      eligible++;
+      const ref = exps[exps.length-1];
+      const refEnd = new Date(ref.validityEnd); refEnd.setHours(0,0,0,0);
+      const { renewed, auto } = clientRenewedAfter(sorted, refEnd, ref);
 
-    totalWithExpired++;
+      if (collectLists) {
+        const latest = sorted[sorted.length-1];
+        const client = { name: clientPolicies[0].clientName, policies: sorted.length, insurer: latest.insurer, lastEnd: latest.validityEnd };
+        if (renewed) renewedClients.push({...client, autoRenewed: auto});
+        else notRenewedClients.push(client);
+      }
+      if (renewed) renewedCount++;
+    });
+    return { eligible, renewedCount, renewedClients, notRenewedClients };
+  };
 
-    const latest = sorted[sorted.length-1];
-    const client = { name: clientPolicies[0].clientName, policies: sorted.length, insurer: latest.insurer, lastEnd: latest.validityEnd };
+  // Janela atual: últimos 12 meses, excluindo os 45 dias de graça
+  const cur  = evalWindow(windowStart, decisionCutoff, true);
+  // Janela anterior: os 12 meses antes disso (para tendência)
+  const prev = evalWindow(prevWindowStart, windowStart, false);
 
-    // Seguro Ative: renovação automática — qualquer apólice vencida já conta como renovado
-    const hasAtiveExpired = sorted.some(p => isAtive(p.insurer) && new Date(p.validityEnd) < today);
-    if (hasAtiveExpired) {
-      totalRenewed++;
-      renewedClients.push({...client, autoRenewed: true});
-      return;
-    }
-
-    // Outras seguradoras: verifica se renovou (nova apólice até 45 dias após fim da anterior)
-    let renewed = false;
-    for (let i=0; i<sorted.length-1; i++) {
-      const endA = new Date(sorted[i].validityEnd);
-      const startB = new Date(sorted[i+1].validityStart);
-      const diff = (startB - endA) / 86400000;
-      if (diff >= -15 && diff <= 45) { renewed = true; break; }
-    }
-
-    if (renewed) { totalRenewed++; renewedClients.push(client); }
-    else { notRenewedClients.push(client); }
+  // Clientes com vencimento recente ainda dentro do prazo de decisão
+  let pendingDecision = 0;
+  Object.values(groups).forEach(clientPolicies => {
+    const sorted = clientPolicies.filter(p=>p.validityStart && p.validityEnd);
+    const hasRecent = sorted.some(p => {
+      const end = new Date(p.validityEnd); end.setHours(0,0,0,0);
+      return end > decisionCutoff && end < today;
+    });
+    if (hasRecent) pendingDecision++;
   });
 
-  const rate = totalWithExpired > 0 ? Math.round((totalRenewed/totalWithExpired)*100) : 0;
-  return { rate, totalRenewed, totalWithExpired, renewedClients, notRenewedClients };
+  const rate = cur.eligible > 0 ? Math.round((cur.renewedCount/cur.eligible)*100) : 0;
+  const prevRate = prev.eligible > 0 ? Math.round((prev.renewedCount/prev.eligible)*100) : null;
+
+  return {
+    rate, prevRate, windowMonths, pendingDecision,
+    totalRenewed: cur.renewedCount,
+    totalWithExpired: cur.eligible,
+    renewedClients: cur.renewedClients,
+    notRenewedClients: cur.notRenewedClients,
+  };
 }
 
 /* ── Plugin de quantidade em cima das barras (reutilizável) ── */
@@ -2398,10 +2434,17 @@ function renderDashboard() {
     </div>
   `;
 
-  /* ═══ Card de taxa de renovação ═══ */
+  /* ═══ Card de taxa de renovação (últimos 12 meses) ═══ */
   const renewal = calcRenewalRate();
   const rateColor = renewal.rate >= 70 ? 'var(--green)' : renewal.rate >= 40 ? 'var(--orange)' : 'var(--red)';
+  const rateHex   = renewal.rate >= 70 ? '#22d3a5' : renewal.rate >= 40 ? '#f97316' : '#f43f5e';
   const rateLabel = renewal.rate >= 70 ? 'Excelente' : renewal.rate >= 40 ? 'Regular' : 'Atenção';
+  const trend = renewal.prevRate !== null ? renewal.rate - renewal.prevRate : null;
+  const churn = renewal.totalWithExpired - renewal.totalRenewed;
+
+  // Gauge circular SVG (donut)
+  const R = 42, CIRC = 2 * Math.PI * R;
+  const dash = CIRC * Math.min(renewal.rate,100) / 100;
 
   // Injeta card extra de renovação antes dos kpis-extra (usa um slot separado)
   let renewalCardEl = document.getElementById('dash-renewal-card');
@@ -2413,37 +2456,53 @@ function renderDashboard() {
     renewalCardEl = el;
   }
   renewalCardEl.innerHTML = `
-    <div class="perf-card" style="padding:18px 20px">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+    <div class="perf-card" style="padding:22px 24px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
         <svg style="width:14px;height:14px;color:${rateColor}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
-        <span class="syne" style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted2)">Taxa de Renovação da Carteira</span>
-        <span style="margin-left:auto;font-size:11px;font-weight:700;color:${rateColor};background:${rateColor}22;padding:2px 10px;border-radius:99px">${rateLabel}</span>
+        <span class="syne" style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted2)">Taxa de Renovação</span>
+        <span style="font-size:10px;font-weight:600;color:var(--muted);background:var(--surface2);border:1px solid var(--border);padding:2px 9px;border-radius:99px">últimos ${renewal.windowMonths} meses</span>
+        <span style="margin-left:auto;font-size:11px;font-weight:700;color:${rateColor};background:${rateHex}22;padding:3px 11px;border-radius:99px">${rateLabel}</span>
       </div>
-      <div style="display:grid;grid-template-columns:auto 1fr auto;gap:16px;align-items:center">
-        <div style="text-align:center">
-          <div style="font-size:38px;font-weight:800;color:${rateColor};line-height:1">${renewal.rate}%</div>
-          <div style="font-size:10px;color:var(--muted);margin-top:4px">taxa geral</div>
+
+      <div style="display:grid;grid-template-columns:auto 1fr auto;gap:26px;align-items:center">
+        <!-- Gauge circular -->
+        <div style="position:relative;width:112px;height:112px;flex-shrink:0">
+          <svg viewBox="0 0 100 100" style="width:112px;height:112px;transform:rotate(-90deg)">
+            <circle cx="50" cy="50" r="${R}" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="9"/>
+            <circle cx="50" cy="50" r="${R}" fill="none" stroke="${rateHex}" stroke-width="9" stroke-linecap="round"
+              stroke-dasharray="${dash.toFixed(1)} ${CIRC.toFixed(1)}"
+              style="filter:drop-shadow(0 0 6px ${rateHex}66);transition:stroke-dasharray .8s cubic-bezier(.4,0,.2,1)"/>
+          </svg>
+          <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
+            <span class="syne" style="font-size:25px;font-weight:800;color:${rateColor};line-height:1">${renewal.rate}%</span>
+            ${trend!==null ? `<span style="font-size:10px;font-weight:700;color:${trend>=0?'var(--green)':'var(--red)'};margin-top:2px">${trend>=0?'▲':'▼'} ${Math.abs(trend)} pts</span>` : ''}
+          </div>
         </div>
+
+        <!-- Métricas -->
         <div>
-          <div style="height:10px;background:rgba(255,255,255,.07);border-radius:99px;overflow:hidden;margin-bottom:10px">
-            <div style="height:100%;width:${renewal.rate}%;background:${rateColor};border-radius:99px;transition:width .6s"></div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+            <div class="perf-metric" style="padding:12px 14px">
+              <div class="perf-label" style="color:rgba(34,211,165,.7)">Renovaram</div>
+              <div class="syne" style="font-size:24px;font-weight:800;color:var(--green);line-height:1">${renewal.totalRenewed}</div>
+            </div>
+            <div class="perf-metric" style="padding:12px 14px">
+              <div class="perf-label" style="color:rgba(244,63,94,.7)">Perderam</div>
+              <div class="syne" style="font-size:24px;font-weight:800;color:var(--red);line-height:1">${churn}</div>
+            </div>
+            <div class="perf-metric" style="padding:12px 14px">
+              <div class="perf-label" style="color:rgba(249,115,22,.7)">Em prazo</div>
+              <div class="syne" style="font-size:24px;font-weight:800;color:var(--orange);line-height:1">${renewal.pendingDecision}</div>
+              <div style="font-size:9.5px;color:var(--muted);margin-top:3px">venceu há &lt; 45 dias</div>
+            </div>
           </div>
-          <div style="display:flex;gap:20px">
-            <div>
-              <div style="font-size:18px;font-weight:700;color:var(--green)">${renewal.totalRenewed}</div>
-              <div style="font-size:11px;color:var(--muted)">renovaram</div>
-            </div>
-            <div>
-              <div style="font-size:18px;font-weight:700;color:var(--red)">${renewal.totalWithExpired - renewal.totalRenewed}</div>
-              <div style="font-size:11px;color:var(--muted)">não renovaram</div>
-            </div>
-            <div>
-              <div style="font-size:18px;font-weight:700;color:var(--muted2)">${renewal.totalWithExpired}</div>
-              <div style="font-size:11px;color:var(--muted)">elegíveis</div>
-            </div>
+          <div style="font-size:10.5px;color:var(--muted);margin-top:10px;line-height:1.5">
+            Base: ${renewal.totalWithExpired} cliente${renewal.totalWithExpired===1?'':'s'} com vencimento no período · renovação = nova apólice em até 45 dias
+            ${trend!==null ? ` · tendência vs 12 meses anteriores (${renewal.prevRate}%)` : ''}
           </div>
         </div>
-        <button onclick="navigate('clients');showRenewalTab()" style="background:var(--accent);border:none;color:#fff;cursor:pointer;font-size:12px;font-weight:600;padding:8px 14px;border-radius:9px;font-family:inherit;white-space:nowrap">Ver detalhes →</button>
+
+        <button onclick="navigate('clients');showRenewalTab()" style="background:var(--accent);border:none;color:#fff;cursor:pointer;font-size:12px;font-weight:600;padding:9px 16px;border-radius:9px;font-family:inherit;white-space:nowrap;box-shadow:0 4px 14px rgba(108,99,255,.35)">Ver detalhes →</button>
       </div>
     </div>
   `;
