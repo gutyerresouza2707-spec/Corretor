@@ -2724,10 +2724,15 @@ function renderDashboard() {
   thisMonth.forEach(p=>{
     const r = (p.referrer||'').trim();
     if (!r) return;
-    if (!byReferrer[r]) byReferrer[r] = { count:0, earning:0 };
+    if (!byReferrer[r]) byReferrer[r] = { count:0, earning:0, byInsurer:{} };
     byReferrer[r].count++;
     byReferrer[r].earning += (p.brokerEarning||0);
+    const ins = (p.insurer||'Não informado').trim() || 'Não informado';
+    byReferrer[r].byInsurer[ins] = (byReferrer[r].byInsurer[ins]||0) + 1;
   });
+  const insurerBreakdownHTML = data => Object.entries(data.byInsurer)
+    .sort((a,b)=>b[1]-a[1])
+    .map(([ins,cnt])=>`${cnt} ${ins}`).join(' · ');
   const referrerRanked = Object.entries(byReferrer).sort((a,b)=>b[1].count-a[1].count).slice(0,8);
   const refList = document.getElementById('dash-referrers');
   if (refList) {
@@ -2738,6 +2743,7 @@ function renderDashboard() {
           <span style="font-size:12.5px;color:var(--muted2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:70%">${medal} ${name}</span>
           <span style="font-size:12.5px;font-weight:700;color:var(--accent2)">${data.count} indicaç${data.count===1?'ão':'ões'}</span>
         </div>
+        <div style="font-size:10.5px;color:var(--muted2);margin-bottom:3px">${insurerBreakdownHTML(data)}</div>
         <div style="font-size:11px;color:var(--green);font-weight:600">${fmt(data.earning)} gerado</div>
       </div>`;
     }).join('') :
@@ -2766,6 +2772,7 @@ function renderDashboard() {
             </div>
             <span style="font-size:11px;color:var(--muted);flex-shrink:0">${data.count} seg.</span>
           </div>
+          <div style="font-size:11px;color:var(--muted2);margin-bottom:6px" title="${insurerBreakdownHTML(data)}">${insurerBreakdownHTML(data)}</div>
           <div style="height:5px;background:rgba(255,255,255,.06);border-radius:99px;overflow:hidden;margin-bottom:6px">
             <div style="height:100%;width:${pct}%;background:var(--accent2);border-radius:99px"></div>
           </div>
