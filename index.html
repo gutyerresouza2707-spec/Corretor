@@ -751,6 +751,15 @@ tbody td { padding:13px 18px; font-size:13px; vertical-align:middle; }
         <div id="dash-goals-bars" style="display:grid;grid-template-columns:1fr 1fr;gap:20px"></div>
       </div>
 
+      <!-- Projeção de vendas (com base na média por dia útil) -->
+      <div class="perf-card" style="margin-bottom:22px;display:none" id="dash-projection-block">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+          <svg style="width:15px;height:15px;color:var(--accent2)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+          <span class="syne" style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--accent2)">Projeção de Vendas · Fim do Mês</span>
+        </div>
+        <div class="grid-2" id="dash-projection-body"></div>
+      </div>
+
       <!-- Dia da semana + Indicadores -->
       <div class="grid-2-1" style="align-items:start;margin-bottom:22px">
         <div class="perf-card">
@@ -2552,6 +2561,35 @@ function renderDashboard() {
   const monthEarningsPending = thisMonth.filter(p=>p.commissionStatus==='Pendente').reduce((a,c)=>a+(c.brokerEarning||0),0);
 
   renderGoals(thisMonth.length, monthEarningsPending);
+
+  /* ═══ Projeção de vendas até o fim do mês (base: média por dia útil) ═══ */
+  const projBlock = document.getElementById('dash-projection-block');
+  if (projBlock) {
+    if (isCurrentMonth && singlePeriod && wd && wdFullMonth) {
+      const remainingWd = Math.max(wdFullMonth - wd, 0);
+      const totalEarningsMonth = thisMonth.reduce((a,c)=>a+(c.brokerEarning||0),0);
+      const avgEarningPerSale = thisMonth.length>0 ? totalEarningsMonth/thisMonth.length : 0;
+      const projectedExtra  = avgNum * remainingWd;
+      const projectedQty    = Math.round(thisMonth.length + projectedExtra);
+      const projectedEarnings = totalEarningsMonth + (projectedExtra * avgEarningPerSale);
+
+      projBlock.style.display = '';
+      document.getElementById('dash-projection-body').innerHTML = `
+        <div class="perf-metric">
+          <div class="perf-label">Seguros Projetados</div>
+          <div class="perf-val">${projectedQty}</div>
+          <div style="font-size:11px;color:rgba(167,139,250,.4);margin-top:4px">base: ${avg} seg/dia útil</div>
+        </div>
+        <div class="perf-metric">
+          <div class="perf-label">Comissão Projetada</div>
+          <div class="syne" style="font-size:22px;font-weight:800;color:var(--green)">${fmt(projectedEarnings)}</div>
+          <div style="font-size:11px;color:rgba(167,139,250,.4);margin-top:4px">${fmtWd(remainingWd)} dias úteis restantes</div>
+        </div>
+      `;
+    } else {
+      projBlock.style.display = 'none';
+    }
+  }
 
   const pctChange = (curr, prev) => prev===0 ? (curr>0?100:0) : Math.round(((curr-prev)/prev)*100);
   const momChange = pctChange(thisMonth.length, prevMonth.length);
