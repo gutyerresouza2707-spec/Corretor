@@ -2131,7 +2131,7 @@ function isInCashflowMonth(dateStr) {
 function renderCashflow() {
   populateCashflowMonthSelect();
 
-  const policiesInMonth = policies.filter(p=>isInCashflowMonth(expectedReceiptDate(p)));
+  const policiesInMonth = policies.filter(p=>isInCashflowMonth(p.validityStart));
   const expensesInMonth = expenses.filter(e=>isInCashflowMonth(e.date));
 
   const paidEarnings = receiptsInPeriod(policies,isInCashflowMonth);
@@ -2143,7 +2143,7 @@ function renderCashflow() {
   document.getElementById('finance-period-label').textContent=period;
   document.getElementById('cash-kpis').innerHTML=[
     {label:'Já entrou',value:paidEarnings,color:'var(--green)',note:'Recebimentos confirmados no mês'},
-    {label:'Falta receber',value:pendingEarnings,color:'var(--orange)',note:'Saldo com previsão neste mês'},
+    {label:'Falta receber',value:pendingEarnings,color:'var(--orange)',note:'Pendente dos seguros com início no mês'},
     {label:'Já saiu',value:totalExp,color:'var(--red)',note:'Despesas pagas no mês'},
     {label:'Saldo do mês',value:money(netProfit),color:netProfit>=0?'var(--green)':'var(--red)',note:'Já entrou − Já saiu',accent:true}
   ].map(c=>'<div class="stat-card'+(c.accent?' accent':'')+'"><div class="stat-label">'+c.label+'</div><div class="stat-value" style="color:'+c.color+'">'+fmt(c.value)+'</div><div class="finance-kpi-note">'+c.note+'</div></div>').join('');
@@ -2152,7 +2152,7 @@ function renderCashflow() {
   note.innerHTML=legacy.length?'<span>'+legacy.length+' apólice(s) antigas estão marcadas como recebidas, mas sem data. Esses valores ficam fora do caixa até a conferência.</span><button class="btn-ghost" onclick="navigate(&quot;actions&quot;)">Conferir em Próximas ações</button>':'';
   renderFinanceReceiptLedger();
 
-  // A seleção de recebimentos tem filtros próprios, independentes dos indicadores mensais.
+  // Lista e seleção seguem o início da vigência; caixa segue a data efetiva do recebimento.
   renderFinanceCommissions();
 
   /* ═══ Evolução 12 meses (receita vs despesa) ═══ */

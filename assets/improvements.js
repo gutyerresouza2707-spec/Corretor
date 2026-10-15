@@ -178,7 +178,7 @@ function clearCommissionSelection() {
 }
 function visibleReceivablePolicies() {
   const search=normalizeCommissionName(document.getElementById('finance-commission-search').value);
-  return policies.filter(p=>isInCashflowMonth(expectedReceiptDate(p))).filter(canReceiveCommission).filter(p=>!search || normalizeCommissionName(p.clientName+' '+(p.vehiclePlate||'')).includes(search));
+  return policies.filter(p=>isInCashflowMonth(p.validityStart)).filter(canReceiveCommission).filter(p=>!search || normalizeCommissionName(p.clientName+' '+(p.vehiclePlate||'')).includes(search));
 }
 function reconcileCommissionSelection() {
   if(commissionSelectionOwner!==accountId) clearCommissionSelection();
@@ -270,7 +270,7 @@ function analyzePastedCommissions() {
   const text=document.getElementById('paid-clients-paste').value;
   if(!text.trim()){showNotif('Cole os nomes dos clientes que pagaram.','error');return;}
   let results;
-  try{results=matchPastedCommissions(text,policies.filter(p=>isInCashflowMonth(expectedReceiptDate(p))));}catch(error){showNotif(error.message,'error');return;}
+  try{results=matchPastedCommissions(text,policies.filter(p=>isInCashflowMonth(p.validityStart)));}catch(error){showNotif(error.message,'error');return;}
   document.getElementById('finance-commission-search').value='';
   selectedCommissions=new Set(results.filter(r=>r.status==='matched').map(r=>r.policyId));
   commissionSelectionOwner=accountId;bulkReceiptSnapshot=null;
