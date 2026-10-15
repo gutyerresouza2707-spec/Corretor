@@ -52,7 +52,7 @@ function renderActionCenter() {
     const button=document.createElement('button');button.className='btn-ghost';button.textContent=late.includes(p)?'Recebimento':'Acompanhar';button.onclick=()=>late.includes(p)?openReceiptDialog(p.id):openRenewalDialog(p.id);
     row.append(label,button);container.append(row);
   }
-  if(legacy.length){const warn=document.createElement('p');warn.className='migration-note';warn.textContent=legacy.length+' apólice(s) marcada(s) como recebida(s) na versão anterior sem data confirmada. Registre os recebimentos no painel abaixo; esses valores não entram no caixa até a confirmação.';container.append(warn);}
+  if(legacy.length){const warn=document.createElement('p');warn.className='migration-note';warn.textContent=legacy.length+' apólice(s) marcada(s) como recebida(s) na versão anterior sem data confirmada. Confirme as datas em Financeiro → Recebimentos e acompanhamento de renovações; esses valores não entram no caixa até a confirmação.';container.append(warn);}
   renderOperationsPanel();
 }
 let renewalPolicyId=null;

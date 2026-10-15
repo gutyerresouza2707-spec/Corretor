@@ -522,9 +522,9 @@ button:disabled{opacity:.45;cursor:not-allowed;}
 #dash-kpis .stat-card:nth-child(3){order:3;}
 #dash-kpis .stat-card:nth-child(4){order:4;}
 .kpi-note{font-size:10px;color:var(--muted);margin-top:5px;}
-#page-dashboard .action-center{margin:0 0 22px;border-color:var(--border);padding:18px 20px;}
-#page-dashboard .action-center h2{font-family:'Montserrat',sans-serif;font-size:14px;}
-#page-dashboard .action-row:last-child{border-bottom:0;}
+#page-actions .action-center{margin:0 0 22px;border-color:var(--border);padding:18px 20px;}
+#page-actions .action-center h2{font-family:'Montserrat',sans-serif;font-size:14px;}
+#page-actions .action-row:last-child{border-bottom:0;}
 #dash-kpis-extra .stat-card{min-height:120px;}
 @media(max-width:1200px){#dash-kpis{grid-template-columns:repeat(3,minmax(0,1fr));}}
 @media(max-width:860px){#dash-kpis{grid-template-columns:repeat(2,minmax(0,1fr));}#dash-renewal-card .renewal-overview{grid-template-columns:1fr!important;gap:18px!important;}#dash-renewal-card .renewal-overview>button{justify-self:start;}}

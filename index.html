@@ -148,6 +148,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
         Dashboard
       </button>
+      <button class="nav-btn" data-tab="actions" onclick="navigate('actions')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="4" width="16" height="17" rx="2"/><path d="M9 2v4M15 2v4M8 11l2 2 5-5M8 17h8"/></svg>Próximas ações</button>
       <button class="nav-btn" data-tab="new" id="nav-new" onclick="navigate('new')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
         Novo Seguro
@@ -238,7 +239,7 @@
 
       <!-- KPIs -->
       <div class="grid-4" style="margin-bottom:22px" id="dash-kpis"></div>
-      <div id="action-center" class="action-center"></div>
+      
 
       <!-- Comparativos extras -->
       <div class="grid-4" style="margin-bottom:22px" id="dash-kpis-extra"></div>
@@ -529,6 +530,8 @@
         </form>
       </div>
     </section>
+
+    <section class="page" id="page-actions"><div class="page-header"><div><h2 class="page-title syne">Próximas ações</h2><p class="page-sub">Renovações, comissões atrasadas e retornos para acompanhar</p></div></div><div id="action-center" class="action-center"></div></section>
 
     <!-- ── LIST ── -->
     <section class="page" id="page-list">
