@@ -2139,17 +2139,18 @@ function renderCashflow() {
   const totalExp       = expensesInMonth.reduce((a,c)=>a+c.amount,0);
   const netProfit      = paidEarnings - totalExp;
 
-  // KPIs
-  document.getElementById('cash-kpis').innerHTML = [
-    { label:'Ganhos Recebidos', value:fmt(paidEarnings),    color:'var(--green)',  bg:'rgba(34,211,165,.07)' },
-    { label:'A Receber',        value:fmt(pendingEarnings), color:'var(--orange)', bg:'rgba(249,115,22,.07)' },
-    { label:'Despesas Pagas',   value:fmt(totalExp),        color:'var(--red)',    bg:'rgba(244,63,94,.07)' },
-    { label:'Saldo de caixa',    value:fmt(netProfit),       color:netProfit>=0?'var(--green)':'var(--red)', accent:true },
-  ].map(c=>`
-    <div class="stat-card${c.accent?' accent':''}" style="${c.accent?'':'background:'+c.bg+';border:1px solid '+c.color+'22'}">
-      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:${c.accent?'rgba(167,139,250,.55)':c.color};opacity:${c.accent?1:.75}">${c.label}</div>
-      <div class="stat-value" style="color:${c.color};font-size:18px">${c.value}</div>
-    </div>`).join('');
+  const period=MESES_PT[cashflowMonth]+'/'+cashflowYear;
+  document.getElementById('finance-period-label').textContent=period;
+  document.getElementById('cash-kpis').innerHTML=[
+    {label:'Já entrou',value:paidEarnings,color:'var(--green)',note:'Recebimentos confirmados no mês'},
+    {label:'Falta receber',value:pendingEarnings,color:'var(--orange)',note:'Saldo com previsão neste mês'},
+    {label:'Já saiu',value:totalExp,color:'var(--red)',note:'Despesas pagas no mês'},
+    {label:'Saldo do mês',value:money(netProfit),color:netProfit>=0?'var(--green)':'var(--red)',note:'Já entrou − Já saiu',accent:true}
+  ].map(c=>'<div class="stat-card'+(c.accent?' accent':'')+'"><div class="stat-label">'+c.label+'</div><div class="stat-value" style="color:'+c.color+'">'+fmt(c.value)+'</div><div class="finance-kpi-note">'+c.note+'</div></div>').join('');
+  const legacy=policies.filter(p=>commissionState(p).key==='legacy');
+  const note=document.getElementById('finance-legacy-note');note.hidden=!legacy.length;
+  note.innerHTML=legacy.length?'<span>'+legacy.length+' apólice(s) antigas estão marcadas como recebidas, mas sem data. Esses valores ficam fora do caixa até a conferência.</span><button class="btn-ghost" onclick="navigate(&quot;actions&quot;)">Conferir em Próximas ações</button>':'';
+  renderFinanceReceiptLedger();
 
   // A seleção de recebimentos tem filtros próprios, independentes dos indicadores mensais.
   renderFinanceCommissions();
@@ -2173,9 +2174,12 @@ function renderCashflow() {
     evoReceita.push(receiptsInPeriod(policies,date=>{const [ry,rm]=date.split('-').map(Number);return ry===y&&rm===m+1;}));
     evoDespesa.push(expsDoMes.reduce((a,c)=>a+c.amount,0));
   }
+  const hasEvolution=evoReceita.some(v=>v!==0)||evoDespesa.some(v=>v!==0);
+  document.getElementById('finance-evolution-chart').hidden=!hasEvolution;
+  document.getElementById('finance-evolution-empty').hidden=hasEvolution;
   destroyChart('evolucao');
   const ctxEvo = document.getElementById('chart-evolucao');
-  if (ctxEvo) {
+  if (ctxEvo && hasEvolution) {
     _charts.evolucao = new Chart(ctxEvo, {
       type:'line',
       data:{ labels: evoLabels,
@@ -2196,6 +2200,8 @@ function renderCashflow() {
   expensesInMonth.forEach(e=>{ const c=e.category||'Outros'; byCategory[c]=(byCategory[c]||0)+e.amount; });
   const catLabels = Object.keys(byCategory);
   const catValues = Object.values(byCategory);
+  document.getElementById('finance-categories-chart').hidden=!catLabels.length;
+  document.getElementById('finance-categories-empty').hidden=!!catLabels.length;
   destroyChart('categorias');
   const ctxCat = document.getElementById('chart-categorias');
   const legendEl = document.getElementById('categorias-legend');
@@ -2219,34 +2225,6 @@ function renderCashflow() {
     } else if (legendEl) {
       legendEl.innerHTML = '';
     }
-  }
-
-  /* ═══ A Receber por prazo (tempo desde a venda) ═══ */
-  const todayCF = new Date(); todayCF.setHours(0,0,0,0);
-  const allPendingGlobal = policies.filter(p=>p.commissionStatus==='Pendente');
-  const todayString=localDate(todayCF);
-  const future=new Date(todayCF);future.setDate(future.getDate()+30);
-  const next30=allPendingGlobal.filter(p=>expectedReceiptDate(p)>=todayString&&expectedReceiptDate(p)<=localDate(future));
-  const overdue=allPendingGlobal.filter(p=>expectedReceiptDate(p)&&expectedReceiptDate(p)<todayString);
-  const sumEarning=arr=>arr.reduce((a,c)=>a+remainingCommission(c),0);
-  const receberPrazoEl = document.getElementById('receber-prazo');
-  if (receberPrazoEl) {
-    receberPrazoEl.innerHTML = `
-      <div style="display:flex;align-items:center;justify-content:space-between;background:rgba(249,115,22,.07);border:1px solid rgba(249,115,22,.15);border-radius:10px;padding:12px 14px">
-        <div>
-          <div style="font-size:12px;font-weight:600;color:var(--orange)">Previsto nos próximos 30 dias</div>
-          <div style="font-size:11px;color:var(--muted);margin-top:2px">${next30.length} comiss${next30.length===1?'ão':'ões'}</div>
-        </div>
-        <div style="font-size:17px;font-weight:700;color:var(--orange)">${fmt(sumEarning(next30))}</div>
-      </div>
-      <div style="display:flex;align-items:center;justify-content:space-between;background:rgba(244,63,94,.07);border:1px solid rgba(244,63,94,.15);border-radius:10px;padding:12px 14px">
-        <div>
-          <div style="font-size:12px;font-weight:600;color:var(--red)">Previsão vencida</div>
-          <div style="font-size:11px;color:var(--muted);margin-top:2px">${overdue.length} comiss${overdue.length===1?'ão':'ões'}</div>
-        </div>
-        <div style="font-size:17px;font-weight:700;color:var(--red)">${fmt(sumEarning(overdue))}</div>
-      </div>
-    `;
   }
 
   // Expenses (do mês selecionado)

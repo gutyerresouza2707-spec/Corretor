@@ -52,7 +52,7 @@ function renderActionCenter() {
     const button=document.createElement('button');button.className='btn-ghost';button.textContent=late.includes(p)?'Recebimento':'Acompanhar';button.onclick=()=>late.includes(p)?openReceiptDialog(p.id):openRenewalDialog(p.id);
     row.append(label,button);container.append(row);
   }
-  if(legacy.length){const warn=document.createElement('p');warn.className='migration-note';warn.textContent=legacy.length+' apólice(s) marcada(s) como recebida(s) na versão anterior sem data confirmada. Confirme as datas em Financeiro → Recebimentos e acompanhamento de renovações; esses valores não entram no caixa até a confirmação.';container.append(warn);}
+  if(legacy.length){const warn=document.createElement('p');warn.className='migration-note';warn.textContent=legacy.length+' apólice(s) marcada(s) como recebida(s) na versão anterior sem data confirmada. Confirme as datas em Financeiro → Consultar outras apólices e recebimentos antigos; esses valores não entram no caixa até a confirmação.';container.append(warn);}
   renderOperationsPanel();
 }
 let renewalPolicyId=null;
@@ -279,7 +279,7 @@ function analyzePastedCommissions() {
   const needsReview=results.filter(r=>['ambiguous','unmatched','legacy'].includes(r.status)).length;
   document.getElementById('paste-review-summary').textContent=matches+' comissão(ões) selecionada(s) automaticamente · '+needsReview+' linha(s) para conferir. Nenhum recebimento foi gravado.';
   const target=document.getElementById('paste-review-results');target.replaceChildren();
-  const labels={matched:'Encontrada e selecionada',duplicate:'Repetida · selecionada uma única vez',ambiguous:'Mais de uma correspondência · escolha abaixo',unmatched:'Não encontrado no mês selecionado · confira o período, nome completo ou placa',paid:'Comissão já recebida · não será repetida',legacy:'Recebida na versão antiga · confirme a data em Recebimentos e acompanhamento de renovações',cancelled:'Sem comissão pendente · cancelada',header:'Cabeçalho ignorado'};
+  const labels={matched:'Encontrada e selecionada',duplicate:'Repetida · selecionada uma única vez',ambiguous:'Mais de uma correspondência · escolha abaixo',unmatched:'Não encontrado no mês selecionado · confira o período, nome completo ou placa',paid:'Comissão já recebida · não será repetida',legacy:'Recebida na versão antiga · confira em Consultar outras apólices e recebimentos antigos',cancelled:'Sem comissão pendente · cancelada',header:'Cabeçalho ignorado'};
   for(const result of results){
     const row=document.createElement('div');row.className='paste-review-row';
     const line=document.createElement('strong');line.textContent='Linha '+result.number+': '+result.line;
@@ -293,4 +293,11 @@ function analyzePastedCommissions() {
     }
     target.append(row);
   }
+}
+
+function renderFinanceReceiptLedger() {
+  const entries=policies.flatMap(p=>(p.receipts||[]).filter(r=>isInCashflowMonth(r.date)).map(r=>({policy:p,receipt:r}))).sort((a,b)=>b.receipt.date.localeCompare(a.receipt.date));
+  document.getElementById('finance-receipts-count').textContent=entries.length;
+  const target=document.getElementById('finance-receipts-list');
+  target.innerHTML=entries.length?'<div class="finance-ledger-scroll"><table><thead><tr><th>Data</th><th>Cliente / apólice</th><th>Valor recebido</th><th>Histórico</th></tr></thead><tbody>'+entries.map(({policy:p,receipt:r})=>'<tr><td>'+fmtDate(r.date)+'</td><td><strong>'+escapeHTML(p.clientName)+'</strong><small>'+escapeHTML(p.vehiclePlate||'Sem placa')+' · '+escapeHTML(p.insurer||'')+'</small></td><td class="finance-ledger-amount">'+fmt(r.amount)+'</td><td><button class="btn-ghost" onclick="openReceiptDialog('+jsArgument(p.id)+')">Ver recebimentos</button></td></tr>').join('')+'</tbody></table></div>':'<div class="finance-empty-message"><strong>Nenhuma entrada confirmada neste mês.</strong><p>Selecione as comissões que você recebeu e confirme a data. Elas aparecerão aqui e atualizarão o saldo.</p></div>';
 }

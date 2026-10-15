@@ -681,11 +681,11 @@
     </div>
 
     <!-- ── CASHFLOW ── -->
-    <section class="page" id="page-cashflow"><details class="action-center"><summary>Recebimentos e acompanhamento de renovações</summary><input id="operations-search" type="search" placeholder="Buscar cliente ou placa" oninput="renderOperationsPanel()"/><div id="operations-list"></div></details>
+    <section class="page" id="page-cashflow">
       <div class="page-header">
         <div>
           <h2 class="page-title syne">Financeiro</h2>
-          <p class="page-sub">Controle de entradas e saídas</p>
+          <p class="page-sub">Confira as comissões, registre as entradas e acompanhe seu saldo.</p>
         </div>
         <div class="page-header-actions" style="display:flex;align-items:center;gap:8px">
           <button onclick="changeCashflowMonth(-1)" title="Mês anterior" style="background:var(--surface);border:1px solid var(--border);color:var(--muted2);cursor:pointer;width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;transition:background .14s" onmouseenter="this.style.background='var(--surface2)'" onmouseleave="this.style.background='var(--surface)'">
@@ -699,89 +699,56 @@
           <button onclick="resetCashflowMonth()" title="Voltar para o mês atual" style="background:none;border:none;color:var(--accent2);cursor:pointer;font-size:12px;font-weight:600;padding:8px 6px">Hoje</button>
         </div>
       </div>
-      <!-- KPIs financeiros -->
-      <div class="grid-4" style="margin-bottom:20px" id="cash-kpis"></div>
-      <div class="action-center paste-commissions">
-        <h3>Conferir clientes pagos na planilha</h3>
+
+      <div class="finance-guide"><div><span class="finance-eyebrow">CONCILIAÇÃO DO MÊS</span><p>O dinheiro só entra no saldo quando você confirma o recebimento.</p></div><div id="finance-period-label" class="finance-period-label"></div></div>
+      <div class="grid-4" id="cash-kpis"></div>
+      <div id="finance-legacy-note" class="finance-context-note" hidden></div>
+      <div class="finance-workspace">        
+        <div class="table-wrap finance-receivables">
+          <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
+            <svg style="width:14px;height:14px;color:var(--orange)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <span class="syne" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted2)">Comissões do período</span>
+            <span class="pill pill-orange" id="pending-badge" style="margin-left:auto">0</span>
+          </div>
+          <details class="paste-commissions finance-paste"><summary>Recebeu a planilha da seguradora? Cole os nomes aqui <span aria-hidden="true">＋</span></summary><div class="finance-paste-content">
+        <h3>1. Cole os nomes · 2. Confira a seleção · 3. Confirme o recebimento</h3>
         <p>Copie os nomes e cole abaixo, um por linha. Você também pode colar linhas da planilha com nome, placa ou CPF. A leitura localiza as comissões do mês selecionado no Financeiro para você revisar.</p>
         <label for="paid-clients-paste">Clientes que pagaram</label>
         <textarea id="paid-clients-paste" rows="5" maxlength="200000" placeholder="Ana Souza&#10;Bruno Lima&#10;Carla Santos" oninput="invalidatePastedCommissions()"></textarea>
         <div class="toolbar"><button class="btn-primary" type="button" onclick="analyzePastedCommissions()">Ler nomes e selecionar comissões</button><button class="btn-ghost" type="button" onclick="clearPastedCommissions()">Limpar nomes</button></div>
         <p class="paste-hint">Após a leitura, clique em Receber selecionadas e informe a data. A confirmação quita o saldo de cada comissão selecionada; valores de outras colunas não são importados. Para um pagamento parcial, use Registrar recebimento.</p>
         <div id="paste-review-summary" role="status" aria-live="polite"></div><div id="paste-review-results"></div>
-      </div>
-
-
-      <!-- Evolução 12 meses -->
-      <div class="table-wrap" style="padding:18px 20px;margin-bottom:20px">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
-          <svg style="width:14px;height:14px;color:var(--accent2)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-          <span class="syne" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted2)">Evolução · Receita vs Despesa (12 meses)</span>
+      </div></details><div class="finance-commission-tools"><label for="finance-commission-search">Buscar comissões a receber</label><input id="finance-commission-search" type="search" placeholder="Nome ou placa" oninput="renderFinanceCommissions()"/><label class="finance-select-all"><input id="select-all-commissions" class="commission-checkbox" type="checkbox" onchange="selectAllCommissions(this.checked)"/> Selecionar todas nos resultados</label><p class="paste-hint">Comissões com recebimento previsto no mês selecionado acima. A busca limita a seleção.</p></div><div class="commission-selection-bar"><span id="commission-selection-summary" role="status" aria-live="polite">Selecione as comissões que você recebeu</span><div class="toolbar"><button id="select-all-receivable-btn" type="button" class="btn-ghost" onclick="selectAllCommissions(true)" title="Seleciona todas as comissões pendentes nos resultados atuais do Financeiro">Selecionar todas a receber</button><button id="clear-commission-selection-btn" type="button" class="btn-ghost" onclick="selectAllCommissions(false)" disabled>Limpar seleção</button><button id="receive-selected-btn" class="btn-primary" onclick="openBulkReceiptDialog()" disabled>Receber selecionadas</button></div></div><div class="scroll-panel" id="pending-list"></div>
         </div>
-        <div style="position:relative;width:100%;height:220px">
-          <canvas id="chart-evolucao"></canvas>
-        </div>
-      </div>
-
-      <div class="grid-2-1" style="margin-bottom:20px">
-        <!-- Despesas por categoria -->
-        <div class="table-wrap" style="padding:18px 20px">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
-            <svg style="width:14px;height:14px;color:var(--accent2)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 010 20z"/></svg>
-            <span class="syne" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted2)">Despesas por Categoria</span>
-          </div>
-          <div style="position:relative;width:100%;height:200px">
-            <canvas id="chart-categorias"></canvas>
-          </div>
-          <div id="categorias-legend" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:12px"></div>
-        </div>
-        <!-- Comissões a receber por prazo -->
-        <div class="table-wrap" style="padding:18px 20px">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
-            <svg style="width:14px;height:14px;color:var(--orange)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-            <span class="syne" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted2)">A Receber por Prazo</span>
-          </div>
-          <div id="receber-prazo" style="display:flex;flex-direction:column;gap:10px"></div>
-        </div>
-      </div>
-
-      <div class="grid-1-1">
-        <!-- Pendentes -->
-        <div class="table-wrap" style="display:flex;flex-direction:column;max-height:720px">
-          <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
-            <svg style="width:14px;height:14px;color:var(--orange)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-            <span class="syne" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted2)">Comissões a receber</span>
-            <span class="pill pill-orange" id="pending-badge" style="margin-left:auto">0</span>
-          </div>
-          <div class="finance-commission-tools"><label for="finance-commission-search">Buscar comissões a receber</label><input id="finance-commission-search" type="search" placeholder="Nome ou placa" oninput="renderFinanceCommissions()"/><label class="finance-select-all"><input id="select-all-commissions" class="commission-checkbox" type="checkbox" onchange="selectAllCommissions(this.checked)"/> Selecionar todas nos resultados</label><p class="paste-hint">Comissões com recebimento previsto no mês selecionado acima. A busca limita a seleção.</p></div><div class="commission-selection-bar"><span id="commission-selection-summary" role="status" aria-live="polite">Selecione as comissões que você recebeu</span><div class="toolbar"><button id="select-all-receivable-btn" type="button" class="btn-ghost" onclick="selectAllCommissions(true)" title="Seleciona todas as comissões pendentes nos resultados atuais do Financeiro">Selecionar todas a receber</button><button id="clear-commission-selection-btn" type="button" class="btn-ghost" onclick="selectAllCommissions(false)" disabled>Limpar seleção</button><button id="receive-selected-btn" class="btn-primary" onclick="openBulkReceiptDialog()" disabled>Receber selecionadas</button></div></div><div class="scroll-panel" id="pending-list"></div>
-        </div>
-        <!-- Despesas -->
-        <div class="table-wrap" style="display:flex;flex-direction:column;max-height:460px">
+        
+        <div class="table-wrap finance-expenses">
           <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
             <svg style="width:14px;height:14px;color:var(--red)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>
-            <span class="syne" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted2)">Despesas</span>
+            <span class="syne" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted2)">Despesas pagas</span>
             <span class="pill pill-red" id="expense-badge" style="margin-left:auto">0</span>
           </div>
           <form class="expense-form-row" onsubmit="addExpense(event)">
-            <input required type="text" id="exp-desc" placeholder="Descrição (ex: panfletos)..." style="flex:1"/>
-            <select id="exp-category" style="width:128px;background:var(--surface2);border:1px solid var(--border2);border-radius:9px;color:var(--text);font-family:'Inter',sans-serif;font-size:13px;padding:0 8px">
+            <label class="finance-exp-description">Descrição<input aria-label="Descrição da despesa" required type="text" id="exp-desc" placeholder="Descrição (ex: panfletos)..." style="flex:1"/></label>
+            <label>Categoria<select id="exp-category" style="width:128px;background:var(--surface2);border:1px solid var(--border2);border-radius:9px;color:var(--text);font-family:'Inter',sans-serif;font-size:13px;padding:0 8px">
               <option value="Divulgação">Divulgação</option>
               <option value="Instagram">Instagram</option>
               <option value="Campanhas">Campanhas</option>
               <option value="Impresso">Impresso</option>
               <option value="Outros">Outros</option>
-            </select>
-            <input type="date" id="exp-date" required aria-label="Data do pagamento da despesa"/><input required type="number" min="0.01" step="0.01" id="exp-amount" placeholder="R$" style="width:84px"/>
-            <button type="submit" class="add-exp-btn">
+            </select></label>
+            <label>Data do pagamento<input type="date" id="exp-date" required aria-label="Data do pagamento da despesa"/></label><label>Valor pago (R$)<input aria-label="Valor pago da despesa" required type="number" min="0.01" step="0.01" id="exp-amount" placeholder="0,00"/></label>
+            <button type="submit" class="btn-primary finance-add-expense">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+              Registrar despesa
             </button>
           </form>
           <div class="scroll-panel" id="expense-list"></div>
         </div>
-      </div>
-    </section>
-
-  </main>
+</div>
+      <div class="table-wrap finance-ledger"><div class="finance-section-heading"><div><h3>Entradas confirmadas</h3><p>Recebimentos registrados com data neste período.</p></div><span id="finance-receipts-count" class="pill pill-green">0</span></div><div id="finance-receipts-list"></div></div>
+      <details class="finance-reports" ontoggle="if(this.open)renderCashflow()"><summary>Relatórios de apoio <span>Evolução de 12 meses e categorias de despesas</span></summary><div class="finance-report-grid"><div class="table-wrap finance-report-card"><h3>Entradas e despesas · 12 meses</h3><p id="finance-evolution-empty" class="finance-empty-message" hidden>O histórico aparecerá quando houver recebimentos ou despesas registrados com data.</p><div id="finance-evolution-chart" class="finance-chart"><canvas id="chart-evolucao"></canvas></div></div><div class="table-wrap finance-report-card"><h3>Despesas por categoria</h3><p id="finance-categories-empty" class="finance-empty-message" hidden>Nenhuma despesa registrada neste período.</p><div id="finance-categories-chart" class="finance-chart"><canvas id="chart-categorias"></canvas></div><div id="categorias-legend"></div></div></div></details>
+      <details class="action-center finance-all-policies"><summary>Consultar outras apólices e recebimentos antigos</summary><input id="operations-search" type="search" placeholder="Buscar cliente ou placa" oninput="renderOperationsPanel()"/><div id="operations-list"></div></details>
+    </section>  </main>
 </div>
 
 
