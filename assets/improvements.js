@@ -178,7 +178,7 @@ function clearCommissionSelection() {
 }
 function visibleReceivablePolicies() {
   const search=normalizeCommissionName(document.getElementById('finance-commission-search').value);
-  return policies.filter(canReceiveCommission).filter(p=>!search || normalizeCommissionName(p.clientName+' '+(p.vehiclePlate||'')).includes(search));
+  return policies.filter(p=>isInCashflowMonth(expectedReceiptDate(p))).filter(canReceiveCommission).filter(p=>!search || normalizeCommissionName(p.clientName+' '+(p.vehiclePlate||'')).includes(search));
 }
 function reconcileCommissionSelection() {
   if(commissionSelectionOwner!==accountId) clearCommissionSelection();
@@ -270,7 +270,7 @@ function analyzePastedCommissions() {
   const text=document.getElementById('paid-clients-paste').value;
   if(!text.trim()){showNotif('Cole os nomes dos clientes que pagaram.','error');return;}
   let results;
-  try{results=matchPastedCommissions(text,policies);}catch(error){showNotif(error.message,'error');return;}
+  try{results=matchPastedCommissions(text,policies.filter(p=>isInCashflowMonth(expectedReceiptDate(p))));}catch(error){showNotif(error.message,'error');return;}
   document.getElementById('finance-commission-search').value='';
   selectedCommissions=new Set(results.filter(r=>r.status==='matched').map(r=>r.policyId));
   commissionSelectionOwner=accountId;bulkReceiptSnapshot=null;
@@ -279,7 +279,7 @@ function analyzePastedCommissions() {
   const needsReview=results.filter(r=>['ambiguous','unmatched','legacy'].includes(r.status)).length;
   document.getElementById('paste-review-summary').textContent=matches+' comissão(ões) selecionada(s) automaticamente · '+needsReview+' linha(s) para conferir. Nenhum recebimento foi gravado.';
   const target=document.getElementById('paste-review-results');target.replaceChildren();
-  const labels={matched:'Encontrada e selecionada',duplicate:'Repetida · selecionada uma única vez',ambiguous:'Mais de uma correspondência · escolha abaixo',unmatched:'Não encontrado · confira o nome completo ou a placa',paid:'Comissão já recebida · não será repetida',legacy:'Recebida na versão antiga · confirme a data em Recebimentos e acompanhamento de renovações',cancelled:'Sem comissão pendente · cancelada',header:'Cabeçalho ignorado'};
+  const labels={matched:'Encontrada e selecionada',duplicate:'Repetida · selecionada uma única vez',ambiguous:'Mais de uma correspondência · escolha abaixo',unmatched:'Não encontrado no mês selecionado · confira o período, nome completo ou placa',paid:'Comissão já recebida · não será repetida',legacy:'Recebida na versão antiga · confirme a data em Recebimentos e acompanhamento de renovações',cancelled:'Sem comissão pendente · cancelada',header:'Cabeçalho ignorado'};
   for(const result of results){
     const row=document.createElement('div');row.className='paste-review-row';
     const line=document.createElement('strong');line.textContent='Linha '+result.number+': '+result.line;
