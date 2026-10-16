@@ -290,7 +290,7 @@ function calcCommission() {
 }
 
 function clearForm() {
-  const clientSelect=document.getElementById('f-clientId');if(clientSelect)clientSelect.value='';const expected=document.getElementById('f-expectedReceiptDate');if(expected)expected.value='';
+  const expected=document.getElementById('f-expectedReceiptDate');if(expected)expected.value='';
   ['clientName','cpf','clientContact','insurer','vehicleModel','vehiclePlate',
    'validityStart','validityEnd','referrer','premiumAmount','commissionRate',
    'brokerEarning','monthlyInstallment'].forEach(f => document.getElementById('f-'+f).value='');
@@ -300,7 +300,7 @@ function clearForm() {
 }
 
 function populateForm(p) {
-  refreshClientSelect(); document.getElementById('f-clientId').value=p.clientId||''; document.getElementById('f-expectedReceiptDate').value=expectedReceiptDate(p);
+  document.getElementById('f-expectedReceiptDate').value=expectedReceiptDate(p);
   const fields = ['clientName','cpf','clientContact','insurer','vehicleModel','vehiclePlate',
     'validityStart','validityEnd','referrer','premiumAmount','commissionRate',
     'brokerEarning','monthlyInstallment','paymentMethod','commissionStatus'];
@@ -332,7 +332,7 @@ async function handleSubmit(e) {
   const rate    = parseFloat(get('commissionRate'))||0;
   const p = {
     clientName: get('clientName'), cpf: get('cpf'), clientContact: get('clientContact'),
-    insurer: get('insurer'), vehicleModel: get('vehicleModel'), vehiclePlate: get('vehiclePlate').toUpperCase(),
+    insurer: get('insurer'), vehicleModel: get('vehicleModel'), vehiclePlate: get('vehiclePlate').trim().toUpperCase(),
     validityStart: get('validityStart'), validityEnd: get('validityEnd'), referrer: get('referrer'),
     premiumAmount: premium, commissionRate: rate,
     commissionAmount: (premium*rate)/100,
@@ -348,16 +348,13 @@ async function handleSubmit(e) {
   p.vehiclePlate=p.vehiclePlate.replace(/[^A-Z0-9]/g,''); p.insurer=p.insurer.trim();
   if (!p.clientName || !validDocument(p.cpf)) {showNotif('Confira o nome e o CPF/CNPJ informado.','error');return;}
   if (!/^(?:55)?\d{10,11}$/.test(p.clientContact)) {showNotif('Informe um telefone com DDD válido.','error');return;}
-  if (!/^[A-Z]{3}\d[A-Z0-9]\d{2}$/.test(p.vehiclePlate)) {showNotif('Informe uma placa válida, antiga ou Mercosul.','error');return;}
+  if (!p.vehiclePlate) {showNotif('Informe a placa ou o número do chassi do veículo.','error');return;}
   if (!validDate(p.validityStart) || !validDate(p.validityEnd) || p.validityEnd <= p.validityStart) {showNotif('O fim da vigência deve ser posterior ao início.','error');return;}
   if (![premium,rate,p.brokerEarning,p.monthlyInstallment].every(v=>Number.isFinite(v)&&v>=0) || premium===0 || rate>100) {showNotif('Confira os valores e a comissão entre 0 e 100%.','error');return;}
   const duplicate=policies.find(row=>row.id!==p.id && row.vehiclePlate.replace(/[^A-Z0-9]/g,'')===p.vehiclePlate && row.validityStart===p.validityStart);
   if(duplicate){showNotif('Já existe uma apólice para essa placa e início de vigência.','error');return;}
   p.brokerEarning=money(p.brokerEarning);p.commissionAmount=money(p.commissionAmount);p.premiumAmount=money(p.premiumAmount);p.monthlyInstallment=money(p.monthlyInstallment);
-  const selected=document.getElementById('f-clientId')?.value;
-  const registered=selected ? clientRegistry.find(c=>c.id===selected) : null;
-  if(registered && registered.document && p.cpf !== registered.document){showNotif('O documento deve corresponder ao cliente selecionado.','error');return;}
-  p.clientId=registered?.id || old?.clientId || (p.cpf ? 'doc:'+p.cpf : crypto.randomUUID());
+  p.clientId=old?.clientId || (p.cpf ? 'doc:'+p.cpf : crypto.randomUUID());
   p.receipts=old?.receipts || []; p.renewal=old?.renewal || {};
   p.expectedReceiptDate=document.getElementById('f-expectedReceiptDate').value || expectedReceiptDate(p);
   if(p.expectedReceiptDate&&!validDate(p.expectedReceiptDate)){showNotif('Confira a data prevista.','error');return;}
@@ -461,7 +458,6 @@ function clearSearch() {
 function render() {
   migrateClientRegistry();
   renderActionCenter();
-  refreshClientSelect();
   renderBadge();
   if (activeTab==='dashboard') renderDashboard();
   if (activeTab==='list')      renderList();
