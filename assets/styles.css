@@ -663,3 +663,7 @@ button:disabled{opacity:.45;cursor:not-allowed;}
 .client-action-group { display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:5px; }
 .client-renewal-actions { display:flex; flex-wrap:wrap; justify-content:center; gap:4px; }
 .client-renewal-actions .renewal-outcome-btn { padding:5px 7px; font-size:9.5px; }
+.client-detail-renewal { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-top:11px; padding-top:10px; border-top:1px solid var(--border); }
+.client-detail-renewal>span { color:var(--muted2); font-size:11px; }
+.client-detail-renewal .client-renewal-actions { justify-content:flex-end; }
+@media(max-width:520px){.client-detail-renewal{align-items:flex-start;flex-direction:column}.client-detail-renewal .client-renewal-actions{justify-content:flex-start}}

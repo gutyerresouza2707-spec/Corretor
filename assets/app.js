@@ -1623,7 +1623,10 @@ async function setRenewalOutcome(policyId, stage) {
   if(!p || !['Renovado','Recusado'].includes(stage))return;
   const note=stage==='Renovado'?'Renovação confirmada; sem comissão adicional.':'Cliente não renovou.';
   const renewal={...p.renewal,stage,nextAction:'',commissionEarned:stage==='Renovado'?false:undefined,history:[...(p.renewal?.history||[]),{date:localDate(),stage,note}]};
-  if(await commitOperation('policies','upsert',{...p,renewal}))showNotif(stage==='Renovado'?'Renovação registrada sem comissão adicional. A comissão da apólice original foi mantida.':'Cliente registrado como não renovado.');
+  if(await commitOperation('policies','upsert',{...p,renewal})) {
+    showNotif(stage==='Renovado'?'Renovação registrada sem comissão adicional. A comissão da apólice original foi mantida.':'Cliente registrado como não renovado.');
+    if(_currentDetailClient) openClientDetail(_currentDetailClient);
+  }
 }
 
 async function refuseRenewal(action) {
@@ -1974,6 +1977,7 @@ function openClientDetail(clientName) {
   _currentDetailClient = group.id;
 
   const sorted = [...group.policies].sort((a,b)=>new Date(b.validityStart||0)-new Date(a.validityStart||0));
+  const renewalPolicy = renewalPolicyForClient(group);
   const totalEarning = group.policies.reduce((a,c)=>a+(c.brokerEarning||0),0);
   const activeCount = group.policies.filter(p=>getStatus(p.validityEnd).label==='Ativo').length;
 
@@ -2019,6 +2023,13 @@ function openClientDetail(clientName) {
           </button>` : ''}
         </div>
       </div>
+      ${renewalPolicy?.id===p.id ? `<div class="client-detail-renewal">
+        <span>${p.renewal?.stage==='Renovado'?'Renovação registrada':p.renewal?.stage==='Recusado'?'Marcado como não renovado':'Registrar resultado da renovação'}</span>
+        <div class="client-renewal-actions" role="group" aria-label="Resultado da renovação de ${escapeHTML(group.name)}">
+          <button type="button" class="renewal-outcome-btn renewed" onclick="event.stopPropagation();setRenewalOutcome(${jsArgument(p.id)},'Renovado')">Renovou</button>
+          <button type="button" class="renewal-outcome-btn declined" onclick="event.stopPropagation();setRenewalOutcome(${jsArgument(p.id)},'Recusado')">Não renovou</button>
+        </div>
+      </div>` : ''}
     </div>`;
   }).join('');
 
