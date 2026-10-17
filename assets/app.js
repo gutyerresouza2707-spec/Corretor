@@ -1843,6 +1843,22 @@ function getClientGroups() {
   return [...groups.values()];
 }
 
+function renewalPolicyForClient(group) {
+  const upcoming=group.policies.filter(p=>getStatus(p.validityEnd).label==='A Vencer')
+    .sort((a,b)=>new Date(a.validityEnd)-new Date(b.validityEnd));
+  if(upcoming.length)return upcoming[0];
+  const today=new Date();today.setHours(0,0,0,0);
+  const windowStart=new Date(today);windowStart.setMonth(windowStart.getMonth()-12);
+  const expired=group.policies.filter(p=>{
+    if(!p.validityEnd)return false;
+    const end=new Date(p.validityEnd+'T00:00:00');
+    return end>=windowStart && end<=today;
+  }).sort((a,b)=>new Date(b.validityEnd)-new Date(a.validityEnd));
+  if(expired.length)return expired[0];
+  return group.policies.filter(p=>['Renovado','Recusado'].includes(p.renewal?.stage))
+    .sort((a,b)=>new Date(b.validityEnd||0)-new Date(a.validityEnd||0))[0]||null;
+}
+
 function clearClientsSearch() {
   document.getElementById('clients-search-input').value = '';
   renderClients();
@@ -1898,6 +1914,11 @@ function renderClients() {
   tbody.innerHTML = groups.map(g => {
     const sorted = [...g.policies].sort((a,b)=>new Date(b.validityStart||0)-new Date(a.validityStart||0));
     const latest = sorted[0];
+    const renewalPolicy = renewalPolicyForClient(g);
+    const renewalActions = renewalPolicy ? `<div class="client-renewal-actions" role="group" aria-label="Resultado da renovação de ${escapeHTML(g.name)}">
+      <button type="button" class="renewal-outcome-btn renewed" onclick="setRenewalOutcome(${jsArgument(renewalPolicy.id)},'Renovado')">Renovou</button>
+      <button type="button" class="renewal-outcome-btn declined" onclick="setRenewalOutcome(${jsArgument(renewalPolicy.id)},'Recusado')">Não renovou</button>
+    </div>` : '';
     const totalEarning = g.policies.reduce((a,c)=>a+(c.brokerEarning||0),0);
     const upcoming = g.policies
       .filter(p=>{ const s=getStatus(p.validityEnd).label; return s==='Ativo' || s==='A Vencer'; })
@@ -1934,9 +1955,12 @@ function renderClients() {
       </td>
       <td><div style="font-weight:700;font-size:14px;color:var(--accent2)">${fmt(totalEarning)}</div></td>
       <td style="text-align:center" onclick="event.stopPropagation()">
-        <button class="act-btn edit" onclick="openClientDetail(${keyEsc})" title="Ver histórico">
+        <div class="client-action-group">
+          ${renewalActions}
+          <button class="act-btn edit" onclick="openClientDetail(${keyEsc})" title="Ver histórico">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
         </button>
+        </div>
       </td>
     </tr>`;
   }).join('');
