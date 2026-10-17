@@ -69,7 +69,7 @@ function openRenewalDialog(id) {
 async function saveRenewal(event) {
   event.preventDefault();const p=policies.find(p=>p.id===renewalPolicyId);if(!p)return;
   const stage=document.getElementById('renewal-stage').value;const nextAction=document.getElementById('renewal-next').value;const note=document.getElementById('renewal-note').value.trim();
-  const renewal={stage,nextAction:['Renovado','Recusado'].includes(stage)?'':nextAction,history:[...(p.renewal?.history||[]),{date:localDate(),stage,note}]};
+  const renewal={...p.renewal,stage,nextAction:['Renovado','Recusado'].includes(stage)?'':nextAction,commissionEarned:stage==='Renovado'?false:undefined,history:[...(p.renewal?.history||[]),{date:localDate(),stage,note:stage==='Renovado'?(note?note+' · ':'')+'Renovação sem comissão adicional.':note}]};
   event.submitter.disabled=true;try{if(await commitOperation('policies','upsert',{...p,renewal}))hideDialog('renewal-dialog');}finally{event.submitter.disabled=false;}
 }
 function renderOperationsPanel() {

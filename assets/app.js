@@ -656,7 +656,7 @@ function calcRenewalRate(windowMonths = 12) {
   });
 
   const clientRenewedAfter = (sorted, refEnd, refPolicy) => {
-    if (refPolicy.renewal?.stage === 'Renovado') return {renewed:true,auto:false};
+    if (['Renovado','Recusado'].includes(refPolicy.renewal?.stage)) return {renewed:refPolicy.renewal.stage==='Renovado',auto:false};
     const renewed = sorted.some(p => {
       if (!p.validityStart || p.id===refPolicy.id || (refPolicy.vehiclePlate && p.vehiclePlate!==refPolicy.vehiclePlate)) return false;
       const diff = (new Date(p.validityStart) - refEnd) / 86400000;
@@ -943,7 +943,7 @@ function renderDashboard() {
   const pendingEarnings = policiesInSelectedMonth.filter(p=>p.commissionStatus==='Pendente').reduce((a,c)=>a+remainingCommission(c),0);
   const totalExp        = expensesInSelectedMonth.reduce((a,c)=>a+c.amount,0);
   const netProfit       = paidEarnings - totalExp;
-  const renewals        = policies.filter(p=>getStatus(p.validityEnd).label==='A Vencer').sort((a,b)=>getStatus(a.validityEnd).daysLeft-getStatus(b.validityEnd).daysLeft);
+  const renewals        = policies.filter(p=>getStatus(p.validityEnd).label==='A Vencer' && !['Renovado','Recusado'].includes(p.renewal?.stage)).sort((a,b)=>getStatus(a.validityEnd).daysLeft-getStatus(b.validityEnd).daysLeft);
 
   // Label do período para os cards
   const periodoLabel = allYears && allMonths ? 'Todo o período'
@@ -1532,11 +1532,10 @@ function renderDashboard() {
     <svg style="width:14px;height:14px" viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.44.79 3.07 1.2 4.74 1.2 5.46 0 9.91-4.45 9.91-9.91C21.95 6.45 17.5 2 12.04 2zm5.8 14.07c-.24.68-1.42 1.3-1.96 1.38-.5.08-1.13.11-1.83-.12-.42-.13-.96-.31-1.65-.6-2.9-1.25-4.79-4.17-4.94-4.36-.14-.2-1.18-1.57-1.18-3 0-1.42.75-2.12 1.01-2.41.27-.29.58-.36.78-.36.19 0 .39 0 .56.01.18.01.42-.07.65.5.24.58.82 2 .89 2.15.07.15.12.32.02.52-.1.2-.15.32-.3.49-.15.17-.31.39-.45.52-.15.15-.3.31-.13.6.17.3.77 1.27 1.65 2.06 1.13 1.01 2.09 1.32 2.38 1.47.29.15.46.13.63-.08.17-.2.71-.83.9-1.12.19-.29.38-.24.64-.14.26.1 1.65.78 1.94.92.28.14.47.21.54.32.07.12.07.68-.17 1.36z"/></svg>
   </button>` : '';
 
-  const refuseBtn = (p) => `<button onclick="openRefuseTicket(${jsArgument(p.id)})" title="Cliente não quer renovar"
-    style="background:rgba(244,63,94,.1);border:none;color:var(--red);cursor:pointer;width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0"
-    onmouseenter="this.style.background='rgba(244,63,94,.2)'" onmouseleave="this.style.background='rgba(244,63,94,.1)'" >
-    <svg style="width:13px;height:13px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
-  </button>`;
+  const outcomeBtns = (p) => `<div class="renewal-outcome-actions" role="group" aria-label="Resultado da renovação de ${escapeHTML(p.clientName)}">
+    <button type="button" class="renewal-outcome-btn renewed" onclick="setRenewalOutcome(${jsArgument(p.id)},'Renovado')">Renovou</button>
+    <button type="button" class="renewal-outcome-btn declined" onclick="setRenewalOutcome(${jsArgument(p.id)},'Recusado')">Não renovou</button>
+  </div>`;
 
   rList.innerHTML = `
     <!-- Dashboard por seguradora -->
@@ -1559,6 +1558,7 @@ function renderDashboard() {
         <div style="flex:1;min-width:0">
           <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML(p.clientName)}</div>
           <div style="font-size:11px;color:var(--muted);margin-top:1px">${escapeHTML(p.vehicleModel||'')}</div>
+          ${outcomeBtns(p)}
         </div>
         <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
           <div style="text-align:right">
@@ -1584,6 +1584,7 @@ function renderDashboard() {
         <div style="flex:1;min-width:0">
           <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML(p.clientName)}</div>
           <div style="font-size:11px;color:var(--muted);margin-top:1px">${escapeHTML(p.vehicleModel||'')} · ${escapeHTML(p.insurer||'')}</div>
+          ${outcomeBtns(p)}
         </div>
         <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
           <div style="text-align:right">
@@ -1591,7 +1592,6 @@ function renderDashboard() {
             <div style="font-size:10px;color:var(--muted);margin-top:2px">${dLabel}</div>
           </div>
           ${whatsBtn(p)}
-          ${refuseBtn(p)}
         </div>
       </div>`;
     }).join('')}` : ''}
@@ -1616,6 +1616,14 @@ function openRefuseTicket(policyId) {
 function closeRefuseTicket() {
   hideDialog('refuse-ticket-overlay');
   _refusePolicyId = null;
+}
+
+async function setRenewalOutcome(policyId, stage) {
+  const p=policies.find(p=>p.id===policyId);
+  if(!p || !['Renovado','Recusado'].includes(stage))return;
+  const note=stage==='Renovado'?'Renovação confirmada; sem comissão adicional.':'Cliente não renovou.';
+  const renewal={...p.renewal,stage,nextAction:'',commissionEarned:stage==='Renovado'?false:undefined,history:[...(p.renewal?.history||[]),{date:localDate(),stage,note}]};
+  if(await commitOperation('policies','upsert',{...p,renewal}))showNotif(stage==='Renovado'?'Renovação registrada sem comissão adicional. A comissão da apólice original foi mantida.':'Cliente registrado como não renovado.');
 }
 
 async function refuseRenewal(action) {
